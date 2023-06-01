@@ -161,7 +161,7 @@ impl Lexer {
             }
             b'0'..=b'9' => return Ok(Token::Int(self.read_int())),
             0 => Token::Eof,
-            _ => todo!("not yet"),
+            _ => Token::Illegal,
         };
         self.read_char();
         Ok(tok)
