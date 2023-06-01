@@ -11,4 +11,5 @@ fn main() {
     parser::test_integer_literal_expression();
     parser::test_prefix_expressions();
     parser::test_infix_expressions();
+    parser::test_operator_precedence_parsing();
 }

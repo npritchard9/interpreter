@@ -281,6 +281,17 @@ pub enum Expression {
     Id(Token),
 }
 
+impl ToString for Expression {
+    fn to_string(&self) -> String {
+        match self {
+            Expression::Prefix(pe) => pe.to_string(),
+            Expression::Infix(ie) => ie.to_string(),
+            Expression::IntLit(ile) => ile.token.to_string(),
+            Expression::Id(ide) => ide.to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExpressionStatement {
     token: Token,
@@ -412,17 +423,16 @@ impl PrefixExpression {
 
 impl ToString for PrefixExpression {
     fn to_string(&self) -> String {
-        match self.right.clone() {
+        let right = match self.right.clone() {
             Some(expr) => match *expr {
-                Expression::Prefix(p) => {
-                    format!("({}{})", p.op, p.token.to_string())
-                }
-                _ => {
-                    todo!()
-                }
+                Expression::Prefix(p) => p.to_string(),
+                Expression::Infix(i) => i.to_string(),
+                Expression::IntLit(il) => il.token.to_string(),
+                Expression::Id(id) => id.to_string(),
             },
-            None => todo!(),
-        }
+            None => "".to_string(),
+        };
+        format!("({}{})", self.op, right)
     }
 }
 
@@ -447,7 +457,15 @@ impl InfixExpression {
 
 impl ToString for InfixExpression {
     fn to_string(&self) -> String {
-        format!("({:?} {} {:?})", self.left, self.op, self.right)
+        let left = match self.left.clone() {
+            Some(l) => l.to_string(),
+            None => "".to_string(),
+        };
+        let right = match self.right.clone() {
+            Some(r) => r.to_string(),
+            None => "".to_string(),
+        };
+        format!("({} {} {})", left, self.op, right)
     }
 }
 
@@ -736,4 +754,49 @@ pub fn test_infix_expressions() {
         }
     }
     println!("Passed test infix expressions")
+}
+
+pub fn test_operator_precedence_parsing() {
+    let tests = vec![
+        ("-a * b", "((-a) * b)"),
+        ("!-a", "(!(-a))"),
+        ("a + b + c", "((a + b) + c)"),
+        ("a + b - c", "((a + b) - c)"),
+        ("a * b * c", "((a * b) * c)"),
+        ("a * b / c", "((a * b) / c)"),
+        ("a + b / c", "(a + (b / c))"),
+        ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+        ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
+        ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+        ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+        (
+            "3 + 4 * 5 == 3 * 1 + 4 * 5",
+            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+        ),
+        (
+            "3 + 4 * 5 == 3 * 1 + 4 * 5",
+            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+        ),
+    ];
+
+    for test in tests {
+        let l = Lexer::new(test.0.to_string());
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        let errors = p.check_errors();
+        if errors {
+            process::exit(1);
+        }
+        if let Some(prog) = program {
+            let actual = prog.to_string();
+            assert_eq!(
+                actual,
+                test.1.to_string(),
+                "expected {}, got {}",
+                test.1.to_string(),
+                actual
+            )
+        }
+    }
+    println!("Passed test operator precedence parsing")
 }
