@@ -3,38 +3,42 @@ use std::io;
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[repr(usize)]
 pub enum Token {
+    // identifiers
     Ident(String) = 1,
     Int(String),
 
-    Illegal,
+    // special case
     Eof,
+    Illegal,
 
-    Bang,
-    Slash,
-    Asterisk,
-    Equal,
-    NotEqual,
-    LessThan,
-    GreaterThan,
-
+    // operators
     Assign,
-    Plus,
+    Asterisk,
+    Bang,
+    Equal,
+    GreaterThan,
+    LessThan,
     Minus,
+    NotEqual,
+    Plus,
+    Slash,
+
+    // delimiters
     Comma,
-    Semicolon,
-    Lparen,
-    Rparen,
     Lbrace,
+    Lparen,
     Rbrace,
+    Rparen,
+    Semicolon,
 
-    Function,
-    Let,
-
-    If,
+    // keywords
     Else,
+    False,
+    Function,
+    If,
+    Let,
     Return,
     True,
-    False,
 }
 
 impl ToString for Token {
@@ -71,7 +75,6 @@ impl ToString for Token {
     }
 }
 
-#[derive(Debug)]
 pub struct Lexer {
     pub input: Vec<u8>,
     pub pos: usize,
