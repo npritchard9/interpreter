@@ -39,6 +39,14 @@ impl Parser {
             Token::Minus,
             PrefixParseFn::Mut(Parser::parse_prefix_expression),
         );
+        p.register_prefix(
+            Token::True,
+            PrefixParseFn::Ref(Parser::parse_boolean_literal),
+        );
+        p.register_prefix(
+            Token::False,
+            PrefixParseFn::Ref(Parser::parse_boolean_literal),
+        );
         p.register_infix(Token::Plus, Parser::parse_infix_expression);
         p.register_infix(Token::Minus, Parser::parse_infix_expression);
         p.register_infix(Token::Slash, Parser::parse_infix_expression);
@@ -113,9 +121,12 @@ impl Parser {
         Expression::Id(self.cur_token.clone())
     }
 
-    // not sure about the return
     fn parse_integer_literal(&self) -> Expression {
         Expression::IntLit(IntegerLiteral::new(self.cur_token.clone()))
+    }
+
+    fn parse_boolean_literal(&self) -> Expression {
+        Expression::BoolLit(BooleanLiteral::new(self.cur_token.clone()))
     }
 
     fn parse_prefix_expression(&mut self) -> Expression {
@@ -265,6 +276,7 @@ impl ToString for Statement {
                     Expression::Prefix(pe) => pe.to_string(),
                     Expression::Infix(ie) => ie.to_string(),
                     Expression::IntLit(ile) => ile.token.to_string(),
+                    Expression::BoolLit(ble) => ble.token.to_string(),
                     Expression::Id(ide) => ide.to_string(),
                 },
                 None => todo!(),
@@ -278,6 +290,7 @@ pub enum Expression {
     Prefix(PrefixExpression),
     Infix(InfixExpression),
     IntLit(IntegerLiteral),
+    BoolLit(BooleanLiteral),
     Id(Token),
 }
 
@@ -287,6 +300,7 @@ impl ToString for Expression {
             Expression::Prefix(pe) => pe.to_string(),
             Expression::Infix(ie) => ie.to_string(),
             Expression::IntLit(ile) => ile.token.to_string(),
+            Expression::BoolLit(ble) => ble.token.to_string(),
             Expression::Id(ide) => ide.to_string(),
         }
     }
@@ -318,7 +332,22 @@ impl IntegerLiteral {
         let Token::Int(i) = token.clone() else {panic!("This is not an integer")};
         IntegerLiteral {
             token,
-            value: i.parse::<isize>().unwrap(),
+            value: i.parse().unwrap(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BooleanLiteral {
+    token: Token,
+    value: bool,
+}
+
+impl BooleanLiteral {
+    fn new(token: Token) -> Self {
+        BooleanLiteral {
+            token: token.clone(),
+            value: token.to_string().parse().unwrap(),
         }
     }
 }
@@ -428,6 +457,7 @@ impl ToString for PrefixExpression {
                 Expression::Prefix(p) => p.to_string(),
                 Expression::Infix(i) => i.to_string(),
                 Expression::IntLit(il) => il.token.to_string(),
+                Expression::BoolLit(ble) => ble.token.to_string(),
                 Expression::Id(id) => id.to_string(),
             },
             None => "".to_string(),
@@ -628,6 +658,39 @@ pub fn test_integer_literal_expression() {
     println!("Passed test integer literal expression");
 }
 
+pub fn test_boolean_literal_expression() {
+    let input = "true;";
+    let l = Lexer::new(input.to_string());
+    let mut p = Parser::new(l);
+    let program = p.parse_program();
+    let errors = p.check_errors();
+    if errors {
+        process::exit(1);
+    }
+    if let Some(prog) = program {
+        assert_eq!(
+            prog.statements.len(),
+            1,
+            "program has not enough statements. got {}",
+            prog.statements.len()
+        );
+        match prog.statements[0].clone() {
+            Statement::Expression(e) => match e.token {
+                Token::True => {
+                    let b: bool = e.token.to_string().parse().unwrap();
+                    assert_eq!(b, true, "bool value not true, got {b}");
+                }
+                _ => println!("token is not a bool, got {:?}", e.token),
+            },
+            _ => println!(
+                "Statement is not an expression, got {:?}",
+                prog.statements[0].clone()
+            ),
+        }
+    }
+    println!("Passed test boolean literal expression");
+}
+
 pub fn test_prefix_expressions() {
     let prefix_tests = vec![("!5", "!", 5), ("-15", "-", 15)];
     for test in prefix_tests {
@@ -692,6 +755,7 @@ pub fn test_integer_literal(il: Expression, value: isize) -> bool {
                 return false;
             }
         }
+        Expression::BoolLit(_) => panic!("can't have a bool holding an int"),
         Expression::Id(ide) => {
             let integ: isize = ide.to_string().parse().unwrap();
             if integ != value {
