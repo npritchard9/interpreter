@@ -1,8 +1,9 @@
 use std::io;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[repr(usize)]
 pub enum Token {
-    Ident(String),
+    Ident(String) = 1,
     Int(String),
 
     Illegal,
@@ -43,29 +44,29 @@ impl ToString for Token {
             Token::Int(i) => i.to_string(),
             Token::Illegal => "Illegal".to_string(),
             Token::Eof => "Eof".to_string(),
-            Token::Bang => "Bang".to_string(),
-            Token::Slash => "Slash".to_string(),
-            Token::Asterisk => "Asterisk".to_string(),
-            Token::Equal => "Equal".to_string(),
-            Token::NotEqual => "NotEqual".to_string(),
-            Token::LessThan => "LessThan".to_string(),
-            Token::GreaterThan => "GreaterThan".to_string(),
-            Token::Assign => "Assign".to_string(),
-            Token::Plus => "Plus".to_string(),
-            Token::Minus => "Minus".to_string(),
-            Token::Comma => "Comma".to_string(),
-            Token::Semicolon => "Semicolon".to_string(),
-            Token::Lparen => "Lparen".to_string(),
-            Token::Rparen => "Rparen".to_string(),
-            Token::Lbrace => "Lbrace".to_string(),
-            Token::Rbrace => "Rbrace".to_string(),
+            Token::Bang => "!".to_string(),
+            Token::Slash => "/".to_string(),
+            Token::Asterisk => "*".to_string(),
+            Token::Equal => "==".to_string(),
+            Token::NotEqual => "!=".to_string(),
+            Token::LessThan => "<".to_string(),
+            Token::GreaterThan => ">".to_string(),
+            Token::Assign => "=".to_string(),
+            Token::Plus => "+".to_string(),
+            Token::Minus => "-".to_string(),
+            Token::Comma => ",".to_string(),
+            Token::Semicolon => ";".to_string(),
+            Token::Lparen => "(".to_string(),
+            Token::Rparen => ")".to_string(),
+            Token::Lbrace => "{".to_string(),
+            Token::Rbrace => "}".to_string(),
             Token::Function => "Function".to_string(),
-            Token::Let => "Let".to_string(),
-            Token::If => "If".to_string(),
-            Token::Else => "Else".to_string(),
-            Token::Return => "Return".to_string(),
-            Token::True => "True".to_string(),
-            Token::False => "False".to_string(),
+            Token::Let => "let".to_string(),
+            Token::If => "if".to_string(),
+            Token::Else => "else".to_string(),
+            Token::Return => "return".to_string(),
+            Token::True => "true".to_string(),
+            Token::False => "false".to_string(),
         }
     }
 }

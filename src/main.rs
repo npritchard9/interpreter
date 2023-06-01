@@ -5,4 +5,8 @@ mod repl;
 fn main() {
     //repl::start();
     parser::test_let_statements();
+    parser::test_return_statements();
+    parser::test_string();
+    parser::test_identifier_expression();
+    parser::test_integer_literal_expression();
 }
