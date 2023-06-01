@@ -47,6 +47,10 @@ impl Parser {
             Token::False,
             PrefixParseFn::Ref(Parser::parse_boolean_literal),
         );
+        p.register_prefix(
+            Token::Lparen,
+            PrefixParseFn::Mut(Parser::parse_grouped_expression),
+        );
         p.register_infix(Token::Plus, Parser::parse_infix_expression);
         p.register_infix(Token::Minus, Parser::parse_infix_expression);
         p.register_infix(Token::Slash, Parser::parse_infix_expression);
@@ -127,6 +131,15 @@ impl Parser {
 
     fn parse_boolean_literal(&self) -> Expression {
         Expression::BoolLit(BooleanLiteral::new(self.cur_token.clone()))
+    }
+
+    fn parse_grouped_expression(&mut self) -> Expression {
+        self.next_token();
+        let expr = self.parse_expression(Prio::Lowest as usize);
+        if !self.expect_peek(Token::Rparen) {
+            return *expr.unwrap();
+        }
+        *expr.unwrap()
     }
 
     fn parse_prefix_expression(&mut self) -> Expression {
@@ -691,6 +704,7 @@ pub fn test_boolean_literal_expression() {
     println!("Passed test boolean literal expression");
 }
 
+// add bool tests
 pub fn test_prefix_expressions() {
     let prefix_tests = vec![("!5", "!", 5), ("-15", "-", 15)];
     for test in prefix_tests {
@@ -767,6 +781,7 @@ pub fn test_integer_literal(il: Expression, value: isize) -> bool {
     true
 }
 
+// add bool tests
 pub fn test_infix_expressions() {
     let ops = vec!["+", "-", "*", "/", ">", "<", "==", "!="];
     let mut infix_tests = vec![];
@@ -822,6 +837,15 @@ pub fn test_infix_expressions() {
 
 pub fn test_operator_precedence_parsing() {
     let tests = vec![
+        ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+        ("(5 + 5) * 2", "((5 + 5) * 2)"),
+        ("2 / (5 + 5)", "(2 / (5 + 5))"),
+        ("-(5 + 5)", "(-(5 + 5))"),
+        ("!(true == true)", "(!(true == true))"),
+        ("true", "true"),
+        ("false", "false"),
+        ("3 > 5 == false", "((3 > 5) == false)"),
+        ("3 < 5 == true", "((3 < 5) == true)"),
         ("-a * b", "((-a) * b)"),
         ("!-a", "(!(-a))"),
         ("a + b + c", "((a + b) + c)"),
