@@ -12,7 +12,7 @@ pub struct Parser {
 }
 
 impl Parser {
-    fn new(l: Lexer) -> Self {
+    pub fn new(l: Lexer) -> Self {
         let mut p = Parser {
             l,
             cur_token: Token::Eof,
@@ -66,6 +66,10 @@ impl Parser {
         p.register_infix(Token::GreaterThan, Parser::parse_infix_expression);
         p.register_infix(Token::Lparen, Parser::parse_call_expression);
         p
+    }
+
+    pub fn errors(&self) -> Vec<String> {
+        self.errors.clone()
     }
 
     fn check_errors(&self) -> bool {
@@ -361,7 +365,7 @@ impl Parser {
         }
     }
 
-    fn parse_program(&mut self) -> Option<Program> {
+    pub fn parse_program(&mut self) -> Option<Program> {
         let mut program = Program::new();
         while self.cur_token != Token::Eof {
             let stmt = self.parse_statement();
