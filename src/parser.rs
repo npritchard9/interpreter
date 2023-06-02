@@ -288,11 +288,7 @@ impl Parser {
     }
 
     fn parse_let_statement(&mut self) -> Option<Statement> {
-        let mut stmt = LetStatement::new(
-            self.cur_token.clone(),
-            self.peek_token.clone(),
-            self.peek_token.clone(),
-        );
+        let mut stmt = LetStatement::new(self.cur_token.clone(), self.peek_token.clone());
         if !self.expect_peek(Token::Ident(self.peek_token.to_string())) {
             return None;
         }
@@ -300,15 +296,19 @@ impl Parser {
         if !self.expect_peek(Token::Assign) {
             return None;
         }
-        while !self.cur_token_is(Token::Semicolon) {
+        self.next_token();
+        stmt.value = self.parse_expression(Prio::Lowest as usize);
+        if self.peek_token_is(Token::Semicolon) {
             self.next_token();
         }
         Some(Statement::Let(stmt))
     }
 
     fn parse_return_statement(&mut self) -> Option<Statement> {
-        let stmt = ReturnStatement::new(self.cur_token.clone(), self.peek_token.clone());
+        let mut stmt = ReturnStatement::new(self.cur_token.clone());
         self.next_token();
+
+        stmt.value = self.parse_expression(Prio::Lowest as usize);
 
         while !self.cur_token_is(Token::Semicolon) {
             self.next_token();
@@ -607,12 +607,24 @@ impl ToString for BlockStatement {
 pub struct LetStatement {
     token: Token,
     name: Token,
-    value: Token,
+    value: Option<Box<Expression>>,
 }
 
 impl LetStatement {
-    fn new(token: Token, name: Token, value: Token) -> Self {
-        LetStatement { token, name, value }
+    fn new(token: Token, name: Token) -> Self {
+        LetStatement {
+            token,
+            name,
+            value: None,
+        }
+    }
+
+    fn new_full(token: Token, name: Token, value: Expression) -> Self {
+        LetStatement {
+            token,
+            name,
+            value: Some(Box::new(value)),
+        }
     }
 }
 
@@ -622,7 +634,7 @@ impl ToString for LetStatement {
             "{} {} = {};",
             self.token.to_string(),
             self.name.to_string(),
-            self.value.to_string()
+            self.value.clone().unwrap().to_string()
         )
     }
 }
@@ -630,18 +642,22 @@ impl ToString for LetStatement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReturnStatement {
     token: Token,
-    value: Token,
+    value: Option<Box<Expression>>,
 }
 
 impl ReturnStatement {
-    fn new(token: Token, value: Token) -> Self {
-        ReturnStatement { token, value }
+    fn new(token: Token) -> Self {
+        ReturnStatement { token, value: None }
     }
 }
 
 impl ToString for ReturnStatement {
     fn to_string(&self) -> String {
-        format!("{} {};", self.token.to_string(), self.value.to_string(),)
+        format!(
+            "{} {};",
+            self.token.to_string(),
+            self.value.clone().unwrap().to_string(),
+        )
     }
 }
 
@@ -820,7 +836,10 @@ pub fn test_return_statements() {
             match s {
                 Statement::Return(r) => {
                     if r.token.to_string() != "return" {
-                        println!("return literal not return, got {}", r.value.to_string())
+                        println!(
+                            "return literal not return, got {}",
+                            r.value.clone().unwrap().to_string()
+                        )
                     }
                 }
                 _ => println!("statement is not a return, got {s:?}"),
@@ -832,10 +851,10 @@ pub fn test_return_statements() {
 
 pub fn test_string() {
     let mut program = Program::new();
-    let statements = vec![Statement::Let(LetStatement::new(
+    let statements = vec![Statement::Let(LetStatement::new_full(
         Token::Let,
         Token::Ident("myVar".to_string()),
-        Token::Ident("anotherVar".to_string()),
+        Expression::Id(Token::Ident("anotherVar".to_string())),
     ))];
     program.statements = statements;
     assert_eq!(
