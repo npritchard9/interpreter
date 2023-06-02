@@ -64,6 +64,7 @@ impl Parser {
         p.register_infix(Token::NotEqual, Parser::parse_infix_expression);
         p.register_infix(Token::LessThan, Parser::parse_infix_expression);
         p.register_infix(Token::GreaterThan, Parser::parse_infix_expression);
+        p.register_infix(Token::Lparen, Parser::parse_call_expression);
         p
     }
 
@@ -177,6 +178,32 @@ impl Parser {
             return tokens;
         }
         tokens
+    }
+
+    fn parse_call_expression(&mut self, func: Expression) -> Expression {
+        let mut expr = CallExpression::new(self.cur_token.clone(), func);
+        expr.args = self.parse_call_arguments();
+        Expression::Call(expr)
+    }
+
+    fn parse_call_arguments(&mut self) -> Vec<Option<Box<Expression>>> {
+        let mut args = vec![];
+        if self.peek_token_is(Token::Rparen) {
+            self.next_token();
+            return args;
+        }
+        self.next_token();
+        args.push(self.parse_expression(Prio::Lowest as usize));
+        while self.peek_token_is(Token::Comma) {
+            self.next_token();
+            self.next_token();
+            args.push(self.parse_expression(Prio::Lowest as usize));
+        }
+
+        if !self.expect_peek(Token::Rparen) {
+            return args;
+        }
+        args
     }
 
     fn parse_if_expression(&mut self) -> Expression {
@@ -372,6 +399,7 @@ impl ToString for Statement {
                     Expression::If(ife) => ife.to_string(),
                     Expression::Id(ide) => ide.to_string(),
                     Expression::Fn(fe) => fe.to_string(),
+                    Expression::Call(ce) => ce.to_string(),
                 },
                 None => todo!(),
             },
@@ -388,6 +416,7 @@ pub enum Expression {
     If(If),
     Id(Token),
     Fn(FunctionLiteral),
+    Call(CallExpression),
 }
 
 impl ToString for Expression {
@@ -400,6 +429,7 @@ impl ToString for Expression {
             Expression::If(ife) => ife.to_string(),
             Expression::Id(ide) => ide.to_string(),
             Expression::Fn(fe) => fe.to_string(),
+            Expression::Call(ce) => ce.to_string(),
         }
     }
 }
@@ -518,6 +548,33 @@ impl ToString for FunctionLiteral {
             params.join(", "),
             self.body.to_string()
         )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CallExpression {
+    token: Token,
+    func: Box<Expression>,
+    args: Vec<Option<Box<Expression>>>,
+}
+
+impl CallExpression {
+    fn new(token: Token, func: Expression) -> Self {
+        CallExpression {
+            token: token.clone(),
+            func: Box::new(func),
+            args: Vec::new(),
+        }
+    }
+}
+
+impl ToString for CallExpression {
+    fn to_string(&self) -> String {
+        let mut args: Vec<String> = vec![];
+        for a in self.args.iter() {
+            args.push(a.clone().unwrap().to_string());
+        }
+        format!("{}({})", self.func.to_string(), args.join(", "))
     }
 }
 
@@ -655,6 +712,7 @@ impl ToString for PrefixExpression {
                 Expression::If(ife) => ife.to_string(),
                 Expression::Id(id) => id.to_string(),
                 Expression::Fn(fe) => fe.to_string(),
+                Expression::Call(ce) => ce.to_string(),
             },
             None => "".to_string(),
         };
@@ -963,6 +1021,7 @@ pub fn test_integer_literal(il: Expression, value: isize) -> bool {
             }
         }
         Expression::Fn(_) => panic!("can't have a function holding an int"),
+        Expression::Call(_) => panic!("can't have a call holding an int"),
     }
     true
 }
@@ -1023,6 +1082,15 @@ pub fn test_infix_expressions() {
 
 pub fn test_operator_precedence_parsing() {
     let tests = vec![
+        ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+        (
+            "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+            "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+        ),
+        (
+            "add(a + b + c * d / f + g)",
+            "add((((a + b) + ((c * d) / f)) + g))",
+        ),
         ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
         ("(5 + 5) * 2", "((5 + 5) * 2)"),
         ("2 / (5 + 5)", "(2 / (5 + 5))"),
@@ -1303,4 +1371,46 @@ pub fn test_function_param_parsing() {
         }
     }
     println!("Passed test parse function params")
+}
+
+pub fn test_call_expression() {
+    let input = "add(1, 2 * 3, 4 + 5);";
+    let l = Lexer::new(input.to_string());
+    let mut p = Parser::new(l);
+    let program = p.parse_program();
+    let errors = p.check_errors();
+    if errors {
+        process::exit(1);
+    }
+    if let Some(prog) = program {
+        assert_eq!(
+            prog.statements.len(),
+            1,
+            "length of params wrong, want 1, got {}",
+            prog.statements.len()
+        );
+        match &prog.statements[0] {
+            Statement::Expression(e) => match *e.expression.clone().unwrap() {
+                Expression::Call(ce) => {
+                    assert_eq!(
+                        ce.func.clone().to_string(),
+                        "add",
+                        "fn is not add, got {}",
+                        ce.func.clone().to_string()
+                    );
+                    assert_eq!(ce.args.len(), 3, "args len is not 3, got {}", ce.args.len());
+                    // test args work
+                }
+                _ => println!(
+                    "exp is not a call expr, got {}",
+                    e.expression.clone().unwrap().to_string()
+                ),
+            },
+            _ => println!(
+                "stmt is not an expression, got {}",
+                prog.statements[0].to_string()
+            ),
+        }
+    }
+    println!("Passed test parse call expression")
 }
