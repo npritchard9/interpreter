@@ -52,6 +52,10 @@ impl Parser {
             PrefixParseFn::Mut(Parser::parse_grouped_expression),
         );
         p.register_prefix(Token::If, PrefixParseFn::Mut(Parser::parse_if_expression));
+        p.register_prefix(
+            Token::Function,
+            PrefixParseFn::Mut(Parser::parse_fn_literal),
+        );
         p.register_infix(Token::Plus, Parser::parse_infix_expression);
         p.register_infix(Token::Minus, Parser::parse_infix_expression);
         p.register_infix(Token::Slash, Parser::parse_infix_expression);
@@ -141,6 +145,38 @@ impl Parser {
             return *expr.unwrap();
         }
         *expr.unwrap()
+    }
+
+    fn parse_fn_literal(&mut self) -> Expression {
+        let mut func = FunctionLiteral::new(self.cur_token.clone());
+        if !self.expect_peek(Token::Lparen) {
+            return Expression::Fn(func);
+        }
+        func.params = self.parse_fn_params();
+        if !self.expect_peek(Token::Lbrace) {
+            return Expression::Fn(func);
+        }
+        func.body = self.parse_block_statement();
+        Expression::Fn(func)
+    }
+
+    fn parse_fn_params(&mut self) -> Vec<Token> {
+        let mut tokens = vec![];
+        if self.peek_token_is(Token::Rparen) {
+            self.next_token();
+            return tokens;
+        }
+        self.next_token();
+        tokens.push(self.cur_token.clone());
+        while self.peek_token_is(Token::Comma) {
+            self.next_token();
+            self.next_token();
+            tokens.push(self.cur_token.clone());
+        }
+        if !self.expect_peek(Token::Rparen) {
+            return tokens;
+        }
+        tokens
     }
 
     fn parse_if_expression(&mut self) -> Expression {
@@ -335,6 +371,7 @@ impl ToString for Statement {
                     Expression::BoolLit(ble) => ble.token.to_string(),
                     Expression::If(ife) => ife.to_string(),
                     Expression::Id(ide) => ide.to_string(),
+                    Expression::Fn(fe) => fe.to_string(),
                 },
                 None => todo!(),
             },
@@ -350,6 +387,7 @@ pub enum Expression {
     BoolLit(BooleanLiteral),
     If(If),
     Id(Token),
+    Fn(FunctionLiteral),
 }
 
 impl ToString for Expression {
@@ -361,6 +399,7 @@ impl ToString for Expression {
             Expression::BoolLit(ble) => ble.token.to_string(),
             Expression::If(ife) => ife.to_string(),
             Expression::Id(ide) => ide.to_string(),
+            Expression::Fn(fe) => fe.to_string(),
         }
     }
 }
@@ -447,6 +486,38 @@ impl ToString for If {
             if_expr.push_str(alt_expr.as_str());
         }
         if_expr
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionLiteral {
+    token: Token,
+    params: Vec<Token>,
+    body: BlockStatement,
+}
+
+impl FunctionLiteral {
+    fn new(token: Token) -> Self {
+        FunctionLiteral {
+            token: token.clone(),
+            params: Vec::new(),
+            body: BlockStatement::new(token),
+        }
+    }
+}
+
+impl ToString for FunctionLiteral {
+    fn to_string(&self) -> String {
+        let mut params: Vec<String> = vec![];
+        for p in self.params.iter() {
+            params.push(p.to_string());
+        }
+        format!(
+            "{}({}) {}",
+            self.token.to_string(),
+            params.join(", "),
+            self.body.to_string()
+        )
     }
 }
 
@@ -583,6 +654,7 @@ impl ToString for PrefixExpression {
                 Expression::BoolLit(ble) => ble.token.to_string(),
                 Expression::If(ife) => ife.to_string(),
                 Expression::Id(id) => id.to_string(),
+                Expression::Fn(fe) => fe.to_string(),
             },
             None => "".to_string(),
         };
@@ -890,6 +962,7 @@ pub fn test_integer_literal(il: Expression, value: isize) -> bool {
                 return false;
             }
         }
+        Expression::Fn(_) => panic!("can't have a function holding an int"),
     }
     true
 }
@@ -1112,4 +1185,122 @@ pub fn test_if_else_expression() {
         };
     }
     println!("Passed test if else expressions");
+}
+
+pub fn test_function_literal_parsing() {
+    let input = "fn(x, y) { x + y; }";
+    let l = Lexer::new(input.to_string());
+    let mut p = Parser::new(l);
+    let program = p.parse_program();
+    let errors = p.check_errors();
+    if errors {
+        process::exit(1);
+    }
+    if let Some(prog) = program {
+        assert_eq!(
+            prog.statements.len(),
+            1,
+            "program body does not contain 1 statement, got {}",
+            prog.statements.len()
+        );
+        let s = prog.statements[0].clone();
+        match &s {
+            Statement::Expression(expr) => match *expr.expression.clone().unwrap() {
+                Expression::Fn(fe) => {
+                    assert_eq!(
+                        fe.params.len(),
+                        2,
+                        "fn params wrong, want 2, got {}",
+                        fe.params.len()
+                    );
+                    assert_eq!(
+                        fe.params[0].to_string(),
+                        "x",
+                        "p0 supposed to be x, got {}",
+                        fe.params[0].to_string()
+                    );
+                    assert_eq!(
+                        fe.params[1].to_string(),
+                        "y",
+                        "p1 supposed to be y, got {}",
+                        fe.params[1].to_string()
+                    );
+                    assert_eq!(
+                        fe.body.statements.len(),
+                        1,
+                        "body supposed to have 1 statement, got {}",
+                        fe.body.statements.len()
+                    );
+                    match fe.body.statements[0].clone() {
+                        Statement::Expression(be) => {
+                            assert_eq!(
+                                be.expression.clone().unwrap().to_string(),
+                                "(x + y)",
+                                "function didnt match, wanted (x + y) got {}",
+                                be.expression.unwrap().to_string()
+                            )
+                        }
+                        _ => println!(
+                            "body should be expr, got {}",
+                            fe.body.statements[0].to_string()
+                        ),
+                    }
+                }
+                _ => println!(
+                    "didn't get a fn, got {}",
+                    expr.expression.clone().unwrap().to_string()
+                ),
+            },
+            _ => println!("stmt is not expr, got {}", &s.to_string()),
+        }
+    }
+    println!("Passed test parse function literal")
+}
+
+pub fn test_function_param_parsing() {
+    let tests = vec![
+        ("fn() {};", vec![]),
+        ("fn(x) {};", vec!["x"]),
+        ("fn(x, y, z) {};", vec!["x", "y", "z"]),
+    ];
+    for t in tests {
+        let l = Lexer::new(t.0.to_string());
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        let errors = p.check_errors();
+        if errors {
+            process::exit(1);
+        }
+        if let Some(prog) = program {
+            let s = prog.statements[0].clone();
+            match &s {
+                Statement::Expression(expr) => match *expr.expression.clone().unwrap() {
+                    Expression::Fn(fe) => {
+                        assert_eq!(
+                            fe.params.len(),
+                            t.1.len(),
+                            "length of params wrong, want {}, got {}",
+                            t.1.len(),
+                            fe.params.len()
+                        );
+                        for (p, test_p) in t.1.iter().zip(fe.params) {
+                            assert_eq!(
+                                &test_p.to_string().as_str(),
+                                p,
+                                "params don't match, want {}, got {}",
+                                p,
+                                test_p.to_string()
+                            )
+                        }
+                    }
+                    _ => println!(
+                        "didn't get a fn, got {}",
+                        expr.expression.clone().unwrap().to_string()
+                    ),
+                },
+                _ => println!("stmt is not expr, got {}", &s.to_string()),
+            }
+        }
+    }
+    println!("Passed test parse function params")
 }

@@ -64,7 +64,7 @@ impl ToString for Token {
             Token::Rparen => ")".to_string(),
             Token::Lbrace => "{".to_string(),
             Token::Rbrace => "}".to_string(),
-            Token::Function => "Function".to_string(),
+            Token::Function => "fn".to_string(),
             Token::Let => "let".to_string(),
             Token::If => "if".to_string(),
             Token::Else => "else".to_string(),

@@ -15,4 +15,6 @@ fn main() {
     parser::test_operator_precedence_parsing();
     parser::test_if_expression();
     parser::test_if_else_expression();
+    parser::test_function_literal_parsing();
+    parser::test_function_param_parsing();
 }
