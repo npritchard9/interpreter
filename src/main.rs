@@ -14,4 +14,5 @@ fn main() {
     parser::test_infix_expressions();
     parser::test_operator_precedence_parsing();
     parser::test_if_expression();
+    parser::test_if_else_expression();
 }

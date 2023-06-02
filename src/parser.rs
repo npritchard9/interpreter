@@ -443,7 +443,7 @@ impl ToString for If {
         };
         let mut if_expr = format!("if {cond} {}", self.consequence.to_string());
         if let Some(alt) = self.alternative.clone() {
-            let alt_expr = format!(" {}", alt.to_string());
+            let alt_expr = format!(" else {}", alt.to_string());
             if_expr.push_str(alt_expr.as_str());
         }
         if_expr
@@ -1056,4 +1056,60 @@ pub fn test_if_expression() {
         };
     }
     println!("Passed test if expressions");
+}
+
+pub fn test_if_else_expression() {
+    let input = "if (x < y) { x } else { y }";
+    let l = Lexer::new(input.to_string());
+    let mut p = Parser::new(l);
+    let program = p.parse_program();
+    let errors = p.check_errors();
+    if errors {
+        process::exit(1);
+    }
+    if let Some(prog) = program {
+        assert_eq!(
+            prog.statements.len(),
+            1,
+            "program body does not contain 1 statement, got {}",
+            prog.statements.len()
+        );
+        let s = prog.statements[0].clone();
+
+        match s.clone() {
+            Statement::Expression(e) => match *e.expression.clone().unwrap() {
+                Expression::If(ife) => {
+                    // add test infix
+                    assert_eq!(
+                        ife.consequence.statements.len(),
+                        1,
+                        "consequence is not 1 stmt, got {}",
+                        ife.consequence.statements.len()
+                    );
+                    match ife.consequence.statements[0].clone() {
+                        Statement::Expression(exp) => {
+                            assert_eq!(
+                                exp.token.to_string(),
+                                "x",
+                                "did not get x, got {}",
+                                exp.token.to_string()
+                            )
+                        }
+                        _ => println!(
+                            "statement[0] is not an expression, got {}",
+                            ife.consequence.statements[0].to_string()
+                        ),
+                    }
+                    assert!(
+                        ife.alternative.is_some(),
+                        "alt is not something, got {:?}",
+                        ife.alternative
+                    )
+                }
+                _ => print!("expr is not an if, got {}", s.clone().to_string()),
+            },
+            _ => println!("stmt is not an expression, got {}", s.clone().to_string()),
+        };
+    }
+    println!("Passed test if else expressions");
 }
