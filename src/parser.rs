@@ -51,6 +51,7 @@ impl Parser {
             Token::Lparen,
             PrefixParseFn::Mut(Parser::parse_grouped_expression),
         );
+        p.register_prefix(Token::If, PrefixParseFn::Mut(Parser::parse_if_expression));
         p.register_infix(Token::Plus, Parser::parse_infix_expression);
         p.register_infix(Token::Minus, Parser::parse_infix_expression);
         p.register_infix(Token::Slash, Parser::parse_infix_expression);
@@ -140,6 +141,48 @@ impl Parser {
             return *expr.unwrap();
         }
         *expr.unwrap()
+    }
+
+    fn parse_if_expression(&mut self) -> Expression {
+        let mut expr = If::new(
+            self.cur_token.clone(),
+            None,
+            BlockStatement::new(self.cur_token.clone()),
+            None,
+        );
+        if !self.expect_peek(Token::Lparen) {
+            return Expression::If(expr);
+        }
+        self.next_token();
+        expr.cond = self.parse_expression(Prio::Lowest as usize);
+        if !self.expect_peek(Token::Rparen) {
+            return Expression::If(expr);
+        }
+        if !self.expect_peek(Token::Lbrace) {
+            return Expression::If(expr);
+        }
+        expr.consequence = self.parse_block_statement();
+        if self.peek_token_is(Token::Else) {
+            self.next_token();
+            if !self.expect_peek(Token::Lbrace) {
+                return Expression::If(expr);
+            }
+            expr.alternative = Some(self.parse_block_statement());
+        }
+        Expression::If(expr)
+    }
+
+    fn parse_block_statement(&mut self) -> BlockStatement {
+        let mut block = BlockStatement::new(self.cur_token.clone());
+        self.next_token();
+        while !self.cur_token_is(Token::Rbrace) && !self.cur_token_is(Token::Eof) {
+            let stmt = self.parse_statement();
+            if let Some(s) = stmt {
+                block.statements.push(s);
+            }
+            self.next_token();
+        }
+        block
     }
 
     fn parse_prefix_expression(&mut self) -> Expression {
@@ -290,6 +333,7 @@ impl ToString for Statement {
                     Expression::Infix(ie) => ie.to_string(),
                     Expression::IntLit(ile) => ile.token.to_string(),
                     Expression::BoolLit(ble) => ble.token.to_string(),
+                    Expression::If(ife) => ife.to_string(),
                     Expression::Id(ide) => ide.to_string(),
                 },
                 None => todo!(),
@@ -304,6 +348,7 @@ pub enum Expression {
     Infix(InfixExpression),
     IntLit(IntegerLiteral),
     BoolLit(BooleanLiteral),
+    If(If),
     Id(Token),
 }
 
@@ -314,6 +359,7 @@ impl ToString for Expression {
             Expression::Infix(ie) => ie.to_string(),
             Expression::IntLit(ile) => ile.token.to_string(),
             Expression::BoolLit(ble) => ble.token.to_string(),
+            Expression::If(ife) => ife.to_string(),
             Expression::Id(ide) => ide.to_string(),
         }
     }
@@ -362,6 +408,70 @@ impl BooleanLiteral {
             token: token.clone(),
             value: token.to_string().parse().unwrap(),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct If {
+    token: Token,
+    cond: Option<Box<Expression>>,
+    consequence: BlockStatement,
+    alternative: Option<BlockStatement>,
+}
+
+impl If {
+    fn new(
+        token: Token,
+        cond: Option<Box<Expression>>,
+        consequence: BlockStatement,
+        alternative: Option<BlockStatement>,
+    ) -> Self {
+        If {
+            token,
+            cond,
+            consequence,
+            alternative,
+        }
+    }
+}
+
+impl ToString for If {
+    fn to_string(&self) -> String {
+        let cond = match self.cond.clone() {
+            Some(c) => c.to_string(),
+            None => "".to_string(),
+        };
+        let mut if_expr = format!("if {cond} {}", self.consequence.to_string());
+        if let Some(alt) = self.alternative.clone() {
+            let alt_expr = format!(" {}", alt.to_string());
+            if_expr.push_str(alt_expr.as_str());
+        }
+        if_expr
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlockStatement {
+    token: Token,
+    statements: Vec<Statement>,
+}
+
+impl BlockStatement {
+    fn new(token: Token) -> Self {
+        BlockStatement {
+            token,
+            statements: Vec::new(),
+        }
+    }
+}
+
+impl ToString for BlockStatement {
+    fn to_string(&self) -> String {
+        let mut stmts = String::new();
+        for s in self.statements.iter() {
+            stmts.push_str(s.to_string().as_str());
+        }
+        stmts
     }
 }
 
@@ -471,6 +581,7 @@ impl ToString for PrefixExpression {
                 Expression::Infix(i) => i.to_string(),
                 Expression::IntLit(il) => il.token.to_string(),
                 Expression::BoolLit(ble) => ble.token.to_string(),
+                Expression::If(ife) => ife.to_string(),
                 Expression::Id(id) => id.to_string(),
             },
             None => "".to_string(),
@@ -770,6 +881,8 @@ pub fn test_integer_literal(il: Expression, value: isize) -> bool {
             }
         }
         Expression::BoolLit(_) => panic!("can't have a bool holding an int"),
+        // not sure
+        Expression::If(_) => panic!("can't have an if holding an int"),
         Expression::Id(ide) => {
             let integ: isize = ide.to_string().parse().unwrap();
             if integ != value {
@@ -887,4 +1000,60 @@ pub fn test_operator_precedence_parsing() {
         }
     }
     println!("Passed test operator precedence parsing")
+}
+
+pub fn test_if_expression() {
+    let input = "if (x < y) { x }";
+    let l = Lexer::new(input.to_string());
+    let mut p = Parser::new(l);
+    let program = p.parse_program();
+    let errors = p.check_errors();
+    if errors {
+        process::exit(1);
+    }
+    if let Some(prog) = program {
+        assert_eq!(
+            prog.statements.len(),
+            1,
+            "program body does not contain 1 statement, got {}",
+            prog.statements.len()
+        );
+        let s = prog.statements[0].clone();
+        match s.clone() {
+            Statement::Expression(e) => match *e.expression.clone().unwrap() {
+                Expression::If(ife) => {
+                    // add test infix
+                    assert_eq!(
+                        ife.consequence.statements.len(),
+                        1,
+                        "consequence is not 1 stmt, got {}",
+                        ife.consequence.statements.len()
+                    );
+                    match ife.consequence.statements[0].clone() {
+                        Statement::Expression(exp) => {
+                            assert_eq!(
+                                exp.token.to_string(),
+                                "x",
+                                "did not get x, got {}",
+                                exp.token.to_string()
+                            )
+                        }
+                        _ => println!(
+                            "statement[0] is not an expression, got {}",
+                            ife.consequence.statements[0].to_string()
+                        ),
+                    }
+                    if ife.alternative.is_some() {
+                        println!(
+                            "alternative was not null, got {:?}",
+                            ife.alternative.unwrap()
+                        )
+                    }
+                }
+                _ => print!("expr is not an if, got {}", s.clone().to_string()),
+            },
+            _ => println!("stmt is not an expression, got {}", s.clone().to_string()),
+        };
+    }
+    println!("Passed test if expressions");
 }
