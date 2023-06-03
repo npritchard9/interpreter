@@ -394,6 +394,7 @@ pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
     Expression(ExpressionStatement),
+    Block(BlockStatement),
 }
 
 impl ToString for Statement {
@@ -414,6 +415,7 @@ impl ToString for Statement {
                 },
                 None => todo!(),
             },
+            Statement::Block(b) => b.to_string(),
         }
     }
 }

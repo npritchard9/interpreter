@@ -23,4 +23,5 @@ fn main() {
     // eval::test_eval_int_expression();
     // eval::test_eval_bool_expression();
     // eval::test_bang_operator();
+    // eval::test_if_else_expression();
 }

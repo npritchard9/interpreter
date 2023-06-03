@@ -1,7 +1,7 @@
 use crate::{
     lexer::Lexer,
     object::{Bool, Int, Object},
-    parser::{Expression, Node, Parser, Statement},
+    parser::{Expression, If, Node, Parser, Statement},
 };
 
 const TRUE: Object = Object::Bool(Bool { value: true });
@@ -27,15 +27,35 @@ pub fn eval(node: Node) -> Object {
                 let right = eval(Node::Expr(*ie.right.unwrap()));
                 return eval_infix_expression(ie.op, left, right);
             }
+            Expression::If(ife) => return eval_if_expression(ife),
             _ => println!("not an int lit, got {}", e.to_string()),
         },
         Node::Prog(p) => return eval_stmts(p.statements),
         Node::Stmt(s) => match s {
             Statement::Expression(es) => return eval(Node::Expr(*es.expression.unwrap())),
+            Statement::Block(bs) => return eval_stmts(bs.statements),
             _ => println!("not an expr stmt, got {}", s.to_string()),
         },
     }
     NULL
+}
+
+pub fn eval_if_expression(ife: If) -> Object {
+    let cond = eval(Node::Expr(*ife.cond.unwrap()));
+    if is_truthy(cond) {
+        return eval(Node::Stmt(Statement::Block(ife.consequence)));
+    } else if ife.alternative.is_some() {
+        return eval(Node::Stmt(Statement::Block(ife.alternative.unwrap())));
+    } else {
+        NULL
+    }
+}
+
+pub fn is_truthy(obj: Object) -> bool {
+    match obj {
+        Object::Null => false,
+        _ => obj == TRUE,
+    }
 }
 
 pub fn eval_stmts(stmts: Vec<Statement>) -> Object {
@@ -65,7 +85,7 @@ pub fn eval_infix_expression(op: String, left: Object, right: Object) -> Object 
             // should change this to use bool func
             return Object::Bool(Bool {
                 value: left != right,
-            })
+            });
         }
         _ => match left {
             Object::Int(li) => match right {
@@ -260,4 +280,43 @@ pub fn test_bang_operator() {
         test_bool_object(evaluated.unwrap(), t.1);
     }
     println!("Passed test bang op");
+}
+
+pub fn test_if_else_expression() {
+    enum IfElseRes {
+        Int(isize),
+        Obj(Object),
+    }
+    use IfElseRes::*;
+    let tests: Vec<(&str, IfElseRes)> = vec![
+        ("if (true) { 10 }", Int(10)),
+        ("if (false) { 10 }", Obj(NULL)),
+        ("if (1) { 10 }", Int(10)),
+        ("if (1 < 2) { 10 }", Int(10)),
+        ("if (1 > 2) { 10 }", Obj(NULL)),
+        ("if (1 > 2) { 10 } else { 20 }", Int(20)),
+        ("if (1 < 2) { 10 } else { 20 }", Int(10)),
+    ];
+    for t in tests {
+        let evaluated = test_eval(t.0.to_string());
+        match t.1 {
+            Int(i) => assert_eq!(
+                test_int_object(evaluated.unwrap(), i),
+                true,
+                "didnt get true for int object"
+            ),
+            Obj(_) => assert_eq!(
+                test_null_object(evaluated.unwrap()),
+                true,
+                "didnt get true for null object"
+            ),
+        }
+    }
+}
+
+pub fn test_null_object(obj: Object) -> bool {
+    if let Object::Null = obj {
+        return true;
+    }
+    false
 }
