@@ -1,6 +1,10 @@
 use std::io::{stdin, stdout, BufRead, Write};
 
-use crate::{lexer::Lexer, parser::Parser};
+use crate::{
+    eval::eval,
+    lexer::Lexer,
+    parser::{Node, Parser},
+};
 
 pub fn start() {
     print!(">> ");
@@ -17,7 +21,12 @@ pub fn start() {
                     println!("{e}");
                 }
             }
-            println!("{}", prog.to_string());
+            let e = eval(Node::Prog(prog));
+            match e {
+                crate::object::Object::Int(i) => println!("{}", i.value),
+                crate::object::Object::Bool(b) => println!("{}", b.value),
+                crate::object::Object::Null => todo!(),
+            }
             print!("\n>> ");
             stdout().flush().unwrap();
         }
