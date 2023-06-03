@@ -21,4 +21,5 @@ fn main() {
     // parser::test_function_param_parsing();
     // parser::test_call_expression();
     // eval::test_eval_int_expression();
+    // eval::test_eval_bool_expression();
 }
