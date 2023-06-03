@@ -1,14 +1,29 @@
+use std::any::Any;
+
 use crate::{
     lexer::Lexer,
     object::{Bool, Int, Object},
     parser::{Expression, Node, Parser, Statement},
 };
 
+const TRUE: Object = Object::Bool(Bool { value: true });
+const FALSE: Object = Object::Bool(Bool { value: false });
+const NULL: Object = Object::Null;
+
 pub fn eval(node: Node) -> Object {
     match node {
         Node::Expr(e) => match e {
             Expression::IntLit(ile) => return Object::Int(Int { value: ile.value }),
-            Expression::BoolLit(ble) => return Object::Bool(Bool { value: ble.value }),
+            Expression::BoolLit(ble) => {
+                return match ble.value {
+                    true => TRUE,
+                    false => FALSE,
+                }
+            }
+            Expression::Prefix(pe) => {
+                let right = eval(Node::Expr(*pe.right.unwrap()));
+                return eval_prefix_expression(pe.op, right);
+            }
             _ => println!("not an int lit, got {}", e.to_string()),
         },
         Node::Prog(p) => return eval_stmts(p.statements),
@@ -17,7 +32,7 @@ pub fn eval(node: Node) -> Object {
             _ => println!("not an expr stmt, got {}", s.to_string()),
         },
     }
-    Object::Null
+    NULL
 }
 
 pub fn eval_stmts(stmts: Vec<Statement>) -> Object {
@@ -28,8 +43,36 @@ pub fn eval_stmts(stmts: Vec<Statement>) -> Object {
     res
 }
 
+pub fn eval_prefix_expression(op: String, right: Object) -> Object {
+    match op.as_str() {
+        "!" => return eval_bang_op_expression(right),
+        "-" => return eval_minus_prefix_op_expression(right),
+        _ => NULL,
+    }
+}
+
+pub fn eval_bang_op_expression(right: Object) -> Object {
+    match right {
+        Object::Bool(b) => match b.value {
+            true => FALSE,
+            false => TRUE,
+        },
+        Object::Null => TRUE,
+        _ => FALSE,
+    }
+}
+
+pub fn eval_minus_prefix_op_expression(right: Object) -> Object {
+    match right {
+        Object::Int(i) => Object::Int(Int { value: -i.value }),
+        _ => NULL,
+    }
+}
+
+// TESTS
+
 pub fn test_eval_int_expression() {
-    let tests = vec![("5", 5), ("10", 10)];
+    let tests = vec![("5", 5), ("10", 10), ("-5", -5), ("-10", -10)];
     for t in tests {
         let evaluated = test_eval(t.0.to_string());
         if let Some(e) = evaluated {
@@ -91,4 +134,20 @@ pub fn test_bool_object(obj: Object, expected: bool) -> bool {
         }
     }
     true
+}
+
+pub fn test_bang_operator() {
+    let tests = vec![
+        ("!true", false),
+        ("!false", true),
+        ("!5", false),
+        ("!!true", true),
+        ("!!false", false),
+        ("!!5", true),
+    ];
+    for t in tests {
+        let evaluated = test_eval(t.0.to_string());
+        test_bool_object(evaluated.unwrap(), t.1);
+    }
+    println!("Passed test bang op");
 }
