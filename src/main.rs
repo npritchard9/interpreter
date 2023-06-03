@@ -25,4 +25,5 @@ fn main() {
     // eval::test_bang_operator();
     // eval::test_if_else_expression();
     // eval::test_return_statements();
+    // eval::test_error_handling();
 }

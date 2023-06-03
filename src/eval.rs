@@ -1,6 +1,6 @@
 use crate::{
     lexer::Lexer,
-    object::{self, Bool, Int, Object, Return},
+    object::{self, Bool, Err, Integer, Object, Return},
     parser::{BlockStatement, Expression, If, Node, Parser, Program, Statement},
 };
 
@@ -11,7 +11,7 @@ const NULL: Object = Object::Null;
 pub fn eval(node: Node) -> Object {
     match node {
         Node::Expr(e) => match e {
-            Expression::IntLit(ile) => return Object::Int(Int { value: ile.value }),
+            Expression::IntLit(ile) => return Object::Int(Integer { value: ile.value }),
             Expression::BoolLit(ble) => {
                 return match ble.value {
                     true => TRUE,
@@ -69,7 +69,10 @@ pub fn eval_block_statement(block: BlockStatement) -> Object {
     let mut res = Object::Null;
     for s in block.statements {
         res = eval(Node::Stmt(s));
-        return res;
+        match res {
+            Object::Return(_) | Object::Error(_) => return res,
+            _ => continue,
+        }
     }
     return res;
 }
@@ -85,13 +88,10 @@ pub fn eval_program(p: Program) -> Object {
     let mut res = Object::Null;
     for s in p.statements {
         res = eval(Node::Stmt(s));
-        if let Object::Return(r) = res {
-            match *r.value {
-                Object::Int(i) => return Object::Int(Int { value: i.value }),
-                Object::Bool(b) => return Object::Bool(Bool { value: b.value }),
-                Object::Return(rv) => return Object::Return(Return { value: rv.value }),
-                _ => return NULL,
-            }
+        match res.clone() {
+            Object::Return(r) => return *r.value,
+            Object::Error(_) => return res.clone(),
+            _ => continue,
         }
     }
     res
@@ -101,7 +101,11 @@ pub fn eval_prefix_expression(op: String, right: Object) -> Object {
     match op.as_str() {
         "!" => return eval_bang_op_expression(right),
         "-" => return eval_minus_prefix_op_expression(right),
-        _ => NULL,
+        _ => {
+            // check this msg val
+            let msg = format!("unknown operator: {}{}", op, right.get_type());
+            return Object::Error(Err { msg });
+        }
     }
 }
 
@@ -121,34 +125,51 @@ pub fn eval_infix_expression(op: String, left: Object, right: Object) -> Object 
         _ => match left {
             Object::Int(li) => match right {
                 Object::Int(ri) => eval_int_infix_expression(op, li, ri),
-                _ => NULL,
+                _ => {
+                    let msg = format!(
+                        "type mismatch: {} {} {}",
+                        left.get_type(),
+                        op,
+                        right.get_type()
+                    );
+                    return Object::Error(Err { msg });
+                }
             },
-            _ => NULL,
+            _ => {
+                // check this msg val
+                let msg = format!(
+                    "unknown operator: {} {} {}",
+                    left.get_type(),
+                    op,
+                    right.get_type()
+                );
+                return Object::Error(Err { msg });
+            }
         },
     }
 }
 
-pub fn eval_int_infix_expression(op: String, left: Int, right: Int) -> Object {
+pub fn eval_int_infix_expression(op: String, left: Integer, right: Integer) -> Object {
     let left_val = left.value;
     let right_val = right.value;
     match op.as_str() {
         "+" => {
-            return Object::Int(Int {
+            return Object::Int(Integer {
                 value: left_val + right_val,
             })
         }
         "-" => {
-            return Object::Int(Int {
+            return Object::Int(Integer {
                 value: left_val - right_val,
             })
         }
         "*" => {
-            return Object::Int(Int {
+            return Object::Int(Integer {
                 value: left_val * right_val,
             })
         }
         "/" => {
-            return Object::Int(Int {
+            return Object::Int(Integer {
                 value: left_val / right_val,
             })
         }
@@ -172,7 +193,15 @@ pub fn eval_int_infix_expression(op: String, left: Int, right: Int) -> Object {
                 value: left_val != right_val,
             })
         }
-        _ => NULL,
+        _ => {
+            let msg = format!(
+                "unknown operator: {} {} {}",
+                Integer::get_type(),
+                op,
+                Integer::get_type()
+            );
+            Object::Error(Err { msg })
+        }
     }
 }
 
@@ -189,8 +218,11 @@ pub fn eval_bang_op_expression(right: Object) -> Object {
 
 pub fn eval_minus_prefix_op_expression(right: Object) -> Object {
     match right {
-        Object::Int(i) => Object::Int(Int { value: -i.value }),
-        _ => NULL,
+        Object::Int(i) => Object::Int(Integer { value: -i.value }),
+        _ => {
+            let msg = format!("unknown operator: -{}", right.get_type());
+            Object::Error(Err { msg })
+        }
     }
 }
 
@@ -377,4 +409,45 @@ pub fn test_return_statements() {
         )
     }
     println!("Passed test return statements")
+}
+
+pub fn test_error_handling() {
+    let tests = vec![
+        ("5 + true;", "type mismatch: INTEGER + BOOLEAN"),
+        ("5 + true; 5;", "type mismatch: INTEGER + BOOLEAN"),
+        ("-true", "unknown operator: -BOOLEAN"),
+        ("true + false;", "unknown operator: BOOLEAN + BOOLEAN"),
+        ("5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"),
+        (
+            "if (10 > 1) { true + false; }",
+            "unknown operator: BOOLEAN + BOOLEAN",
+        ),
+        (
+            r#"if (10 > 1) {
+                if (10 > 1) {
+                    return true + false;
+                }
+                return 1;
+            }"#,
+            "unknown operator: BOOLEAN + BOOLEAN",
+        ),
+    ];
+
+    for t in tests {
+        let evaluated = test_eval(t.0.to_string());
+        match evaluated {
+            Some(eval) => match eval {
+                Object::Error(e) => {
+                    assert_eq!(e.msg, t.1, "wrong error msg, want {}, got {}", t.1, e.msg)
+                }
+                _ => println!(
+                    "obj isnt an error, got {} with {}",
+                    eval.to_string(),
+                    eval.get_type()
+                ),
+            },
+            None => continue,
+        }
+    }
+    println!("Passed test error handling")
 }

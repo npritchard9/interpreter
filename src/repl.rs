@@ -3,6 +3,7 @@ use std::io::{stdin, stdout, BufRead, Write};
 use crate::{
     eval::eval,
     lexer::Lexer,
+    object,
     parser::{Node, Parser},
 };
 
@@ -23,10 +24,11 @@ pub fn start() {
             }
             let e = eval(Node::Prog(prog));
             match e {
-                crate::object::Object::Int(i) => println!("{}", i.value),
-                crate::object::Object::Bool(b) => println!("{}", b.value),
-                crate::object::Object::Null => todo!(),
-                crate::object::Object::Return(_) => todo!(),
+                object::Object::Int(i) => println!("{}", i.value),
+                object::Object::Bool(b) => println!("{}", b.value),
+                object::Object::Null => todo!(),
+                object::Object::Return(_) => todo!(),
+                object::Object::Error(e) => println!("{}", e.to_string()),
             }
             print!("\n>> ");
             stdout().flush().unwrap();
