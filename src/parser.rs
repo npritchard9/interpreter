@@ -2,6 +2,13 @@ use std::{collections::HashMap, process};
 
 use crate::lexer::{Lexer, Token};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Node {
+    Expr(Expression),
+    Stmt(Statement),
+    Prog(Program),
+}
+
 pub struct Parser {
     l: Lexer,
     cur_token: Token,
@@ -665,7 +672,7 @@ impl ToString for ReturnStatement {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Program {
     statements: Vec<Statement>,
 }
