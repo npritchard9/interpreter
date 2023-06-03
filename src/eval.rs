@@ -1,7 +1,7 @@
 use crate::{
     lexer::Lexer,
-    object::{Bool, Int, Object},
-    parser::{Expression, If, Node, Parser, Statement},
+    object::{self, Bool, Int, Object, Return},
+    parser::{BlockStatement, Expression, If, Node, Parser, Program, Statement},
 };
 
 const TRUE: Object = Object::Bool(Bool { value: true });
@@ -30,10 +30,19 @@ pub fn eval(node: Node) -> Object {
             Expression::If(ife) => return eval_if_expression(ife),
             _ => println!("not an int lit, got {}", e.to_string()),
         },
-        Node::Prog(p) => return eval_stmts(p.statements),
+        Node::Prog(p) => return eval_program(p),
         Node::Stmt(s) => match s {
-            Statement::Expression(es) => return eval(Node::Expr(*es.expression.unwrap())),
-            Statement::Block(bs) => return eval_stmts(bs.statements),
+            Statement::Expression(es) => match es.expression {
+                Some(e) => return eval(Node::Expr(*e)),
+                None => return NULL,
+            },
+            Statement::Block(bs) => return eval_block_statement(bs),
+            Statement::Return(rs) => {
+                let val = eval(Node::Expr(*rs.value.unwrap()));
+                return Object::Return(object::Return {
+                    value: Box::new(val),
+                });
+            }
             _ => println!("not an expr stmt, got {}", s.to_string()),
         },
     }
@@ -41,14 +50,28 @@ pub fn eval(node: Node) -> Object {
 }
 
 pub fn eval_if_expression(ife: If) -> Object {
-    let cond = eval(Node::Expr(*ife.cond.unwrap()));
-    if is_truthy(cond) {
-        return eval(Node::Stmt(Statement::Block(ife.consequence)));
-    } else if ife.alternative.is_some() {
-        return eval(Node::Stmt(Statement::Block(ife.alternative.unwrap())));
-    } else {
-        NULL
+    match ife.cond {
+        Some(c) => {
+            let cond = eval(Node::Expr(*c));
+            if is_truthy(cond) {
+                return eval(Node::Stmt(Statement::Block(ife.consequence)));
+            } else if ife.alternative.is_some() {
+                return eval(Node::Stmt(Statement::Block(ife.alternative.unwrap())));
+            } else {
+                NULL
+            }
+        }
+        None => NULL,
     }
+}
+
+pub fn eval_block_statement(block: BlockStatement) -> Object {
+    let mut res = Object::Null;
+    for s in block.statements {
+        res = eval(Node::Stmt(s));
+        return res;
+    }
+    return res;
 }
 
 pub fn is_truthy(obj: Object) -> bool {
@@ -58,10 +81,18 @@ pub fn is_truthy(obj: Object) -> bool {
     }
 }
 
-pub fn eval_stmts(stmts: Vec<Statement>) -> Object {
+pub fn eval_program(p: Program) -> Object {
     let mut res = Object::Null;
-    for s in stmts {
-        res = eval(Node::Stmt(s))
+    for s in p.statements {
+        res = eval(Node::Stmt(s));
+        if let Object::Return(r) = res {
+            match *r.value {
+                Object::Int(i) => return Object::Int(Int { value: i.value }),
+                Object::Bool(b) => return Object::Bool(Bool { value: b.value }),
+                Object::Return(rv) => return Object::Return(Return { value: rv.value }),
+                _ => return NULL,
+            }
+        }
     }
     res
 }
@@ -212,7 +243,7 @@ pub fn test_int_object(obj: Object, expected: isize) -> bool {
             }
         }
         _ => {
-            println!("obj not int, got {}", obj.to_string());
+            println!("obj not int, wanted {}, got {}", expected, obj.to_string());
             return false;
         }
     }
@@ -319,4 +350,31 @@ pub fn test_null_object(obj: Object) -> bool {
         return true;
     }
     false
+}
+
+pub fn test_return_statements() {
+    let tests = vec![
+        ("return 10;", 10),
+        ("return 10; 9;", 10),
+        ("return 2 * 5; 9;", 10),
+        ("9; return 2 * 5; 9;", 10),
+        (
+            "if 10 > 1) {
+            if (10 > 1) {
+                return 10;
+            }
+            return 1;
+        }",
+            10,
+        ),
+    ];
+    for t in tests {
+        let evaluated = test_eval(t.0.to_string());
+        assert_eq!(
+            test_int_object(evaluated.unwrap(), t.1),
+            true,
+            "didnt get true for return"
+        )
+    }
+    println!("Passed test return statements")
 }

@@ -2,6 +2,7 @@
 pub enum Object {
     Int(Int),
     Bool(Bool),
+    Return(Return),
     Null,
 }
 
@@ -11,6 +12,7 @@ impl ToString for Object {
             Object::Int(i) => format!("{}", i.value),
             Object::Bool(b) => format!("{}", b.value),
             Object::Null => "null".to_string(),
+            Object::Return(r) => format!("{}", r.value.to_string()),
         }
     }
 }
@@ -23,4 +25,9 @@ pub struct Int {
 #[derive(PartialEq, Eq)]
 pub struct Bool {
     pub value: bool,
+}
+
+#[derive(PartialEq, Eq)]
+pub struct Return {
+    pub value: Box<Object>,
 }

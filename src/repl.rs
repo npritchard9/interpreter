@@ -26,6 +26,7 @@ pub fn start() {
                 crate::object::Object::Int(i) => println!("{}", i.value),
                 crate::object::Object::Bool(b) => println!("{}", b.value),
                 crate::object::Object::Null => todo!(),
+                crate::object::Object::Return(_) => todo!(),
             }
             print!("\n>> ");
             stdout().flush().unwrap();
