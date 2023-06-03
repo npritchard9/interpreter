@@ -447,8 +447,8 @@ impl ToString for Expression {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExpressionStatement {
-    token: Token,
-    expression: Option<Box<Expression>>,
+    pub token: Token,
+    pub expression: Option<Box<Expression>>,
 }
 
 impl ExpressionStatement {
@@ -462,8 +462,8 @@ impl ExpressionStatement {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IntegerLiteral {
-    token: Token,
-    value: isize,
+    pub token: Token,
+    pub value: isize,
 }
 
 impl IntegerLiteral {
@@ -478,8 +478,8 @@ impl IntegerLiteral {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BooleanLiteral {
-    token: Token,
-    value: bool,
+    pub token: Token,
+    pub value: bool,
 }
 
 impl BooleanLiteral {
@@ -493,10 +493,10 @@ impl BooleanLiteral {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct If {
-    token: Token,
-    cond: Option<Box<Expression>>,
-    consequence: BlockStatement,
-    alternative: Option<BlockStatement>,
+    pub token: Token,
+    pub cond: Option<Box<Expression>>,
+    pub consequence: BlockStatement,
+    pub alternative: Option<BlockStatement>,
 }
 
 impl If {
@@ -532,9 +532,9 @@ impl ToString for If {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionLiteral {
-    token: Token,
-    params: Vec<Token>,
-    body: BlockStatement,
+    pub token: Token,
+    pub params: Vec<Token>,
+    pub body: BlockStatement,
 }
 
 impl FunctionLiteral {
@@ -564,9 +564,9 @@ impl ToString for FunctionLiteral {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallExpression {
-    token: Token,
-    func: Box<Expression>,
-    args: Vec<Option<Box<Expression>>>,
+    pub token: Token,
+    pub func: Box<Expression>,
+    pub args: Vec<Option<Box<Expression>>>,
 }
 
 impl CallExpression {
@@ -591,8 +591,8 @@ impl ToString for CallExpression {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockStatement {
-    token: Token,
-    statements: Vec<Statement>,
+    pub token: Token,
+    pub statements: Vec<Statement>,
 }
 
 impl BlockStatement {
@@ -616,9 +616,9 @@ impl ToString for BlockStatement {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LetStatement {
-    token: Token,
-    name: Token,
-    value: Option<Box<Expression>>,
+    pub token: Token,
+    pub name: Token,
+    pub value: Option<Box<Expression>>,
 }
 
 impl LetStatement {
@@ -652,8 +652,8 @@ impl ToString for LetStatement {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReturnStatement {
-    token: Token,
-    value: Option<Box<Expression>>,
+    pub token: Token,
+    pub value: Option<Box<Expression>>,
 }
 
 impl ReturnStatement {
@@ -674,7 +674,7 @@ impl ToString for ReturnStatement {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Program {
-    statements: Vec<Statement>,
+    pub statements: Vec<Statement>,
 }
 
 impl Program {
@@ -713,9 +713,9 @@ enum Prio {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrefixExpression {
-    token: Token,
-    op: String,
-    right: Option<Box<Expression>>,
+    pub token: Token,
+    pub op: String,
+    pub right: Option<Box<Expression>>,
 }
 
 impl PrefixExpression {
@@ -749,10 +749,10 @@ impl ToString for PrefixExpression {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InfixExpression {
-    token: Token,
-    left: Option<Box<Expression>>,
-    op: String,
-    right: Option<Box<Expression>>,
+    pub token: Token,
+    pub left: Option<Box<Expression>>,
+    pub op: String,
+    pub right: Option<Box<Expression>>,
 }
 
 impl InfixExpression {

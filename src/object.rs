@@ -7,16 +7,17 @@ pub enum Object {
 impl ToString for Object {
     fn to_string(&self) -> String {
         match self {
-            Object::Int(i) => format!("{}", i.val),
-            Object::Bool(b) => format!("{}", b.val),
+            Object::Int(i) => format!("{}", i.value),
+            Object::Bool(b) => format!("{}", b.value),
             Object::Null => "null".to_string(),
         }
     }
 }
 
 pub struct Int {
-    pub val: isize,
+    pub value: isize,
 }
+
 pub struct Bool {
-    pub val: bool,
+    pub value: bool,
 }
