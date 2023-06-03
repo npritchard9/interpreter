@@ -1,3 +1,4 @@
+#[derive(PartialEq, Eq)]
 pub enum Object {
     Int(Int),
     Bool(Bool),
@@ -14,10 +15,12 @@ impl ToString for Object {
     }
 }
 
+#[derive(PartialEq, Eq)]
 pub struct Int {
     pub value: isize,
 }
 
+#[derive(PartialEq, Eq)]
 pub struct Bool {
     pub value: bool,
 }

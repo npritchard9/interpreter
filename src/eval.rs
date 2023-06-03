@@ -1,5 +1,3 @@
-use std::any::Any;
-
 use crate::{
     lexer::Lexer,
     object::{Bool, Int, Object},
@@ -23,6 +21,11 @@ pub fn eval(node: Node) -> Object {
             Expression::Prefix(pe) => {
                 let right = eval(Node::Expr(*pe.right.unwrap()));
                 return eval_prefix_expression(pe.op, right);
+            }
+            Expression::Infix(ie) => {
+                let left = eval(Node::Expr(*ie.left.unwrap()));
+                let right = eval(Node::Expr(*ie.right.unwrap()));
+                return eval_infix_expression(ie.op, left, right);
             }
             _ => println!("not an int lit, got {}", e.to_string()),
         },
@@ -51,6 +54,77 @@ pub fn eval_prefix_expression(op: String, right: Object) -> Object {
     }
 }
 
+pub fn eval_infix_expression(op: String, left: Object, right: Object) -> Object {
+    match op.as_str() {
+        "==" => {
+            return Object::Bool(Bool {
+                value: left == right,
+            })
+        }
+        "!=" => {
+            // should change this to use bool func
+            return Object::Bool(Bool {
+                value: left != right,
+            })
+        }
+        _ => match left {
+            Object::Int(li) => match right {
+                Object::Int(ri) => eval_int_infix_expression(op, li, ri),
+                _ => NULL,
+            },
+            _ => NULL,
+        },
+    }
+}
+
+pub fn eval_int_infix_expression(op: String, left: Int, right: Int) -> Object {
+    let left_val = left.value;
+    let right_val = right.value;
+    match op.as_str() {
+        "+" => {
+            return Object::Int(Int {
+                value: left_val + right_val,
+            })
+        }
+        "-" => {
+            return Object::Int(Int {
+                value: left_val - right_val,
+            })
+        }
+        "*" => {
+            return Object::Int(Int {
+                value: left_val * right_val,
+            })
+        }
+        "/" => {
+            return Object::Int(Int {
+                value: left_val / right_val,
+            })
+        }
+        "<" => {
+            return Object::Bool(Bool {
+                value: left_val < right_val,
+            })
+        }
+        ">" => {
+            return Object::Bool(Bool {
+                value: left_val > right_val,
+            })
+        }
+        "==" => {
+            return Object::Bool(Bool {
+                value: left_val == right_val,
+            })
+        }
+        "!=" => {
+            return Object::Bool(Bool {
+                value: left_val != right_val,
+            })
+        }
+        _ => NULL,
+    }
+}
+
 pub fn eval_bang_op_expression(right: Object) -> Object {
     match right {
         Object::Bool(b) => match b.value {
@@ -72,7 +146,23 @@ pub fn eval_minus_prefix_op_expression(right: Object) -> Object {
 // TESTS
 
 pub fn test_eval_int_expression() {
-    let tests = vec![("5", 5), ("10", 10), ("-5", -5), ("-10", -10)];
+    let tests = vec![
+        ("5", 5),
+        ("10", 10),
+        ("-5", -5),
+        ("-10", -10),
+        ("5 + 5 + 5 + 5 - 10", 10),
+        ("2 * 2 * 2 * 2 * 2", 32),
+        ("-50 + 100 + -50", 0),
+        ("5 * 2 + 10", 20),
+        ("5 + 2 * 10", 25),
+        ("20 + 2 * -10", 0),
+        ("50 / 2 * 2 + 10", 60),
+        ("2 * (5 + 10)", 30),
+        ("3 * 3 * 3 + 10", 37),
+        ("3 * (3 * 3) + 10", 37),
+        ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
+    ];
     for t in tests {
         let evaluated = test_eval(t.0.to_string());
         if let Some(e) = evaluated {
@@ -110,7 +200,27 @@ pub fn test_int_object(obj: Object, expected: isize) -> bool {
 }
 
 pub fn test_eval_bool_expression() {
-    let tests = vec![("true", true), ("false", false)];
+    let tests = vec![
+        ("true", true),
+        ("false", false),
+        ("1 < 2", true),
+        ("1 > 2", false),
+        ("1 < 1", false),
+        ("1 > 1", false),
+        ("1 == 1", true),
+        ("1 != 1", false),
+        ("1 == 2", false),
+        ("1 != 2", true),
+        ("true == true", true),
+        ("false == false", true),
+        ("true == false", false),
+        ("true != false", true),
+        ("false != true", true),
+        ("(1 < 2) == true", true),
+        ("(1 < 2) == false", false),
+        ("(1 > 2) == true", false),
+        ("(1 > 2) == false", true),
+    ];
     for t in tests {
         let evaluated = test_eval(t.0.to_string());
         if let Some(e) = evaluated {
