@@ -6,6 +6,7 @@ pub enum Token {
     // identifiers
     Ident(String) = 1,
     Int(String),
+    TString(String),
 
     // special case
     Eof,
@@ -46,6 +47,7 @@ impl ToString for Token {
         match self {
             Token::Ident(ident) => ident.to_string(),
             Token::Int(i) => i.to_string(),
+            Token::TString(s) => s.to_string(),
             Token::Illegal => "Illegal".to_string(),
             Token::Eof => "Eof".to_string(),
             Token::Bang => "!".to_string(),
@@ -129,6 +131,7 @@ impl Lexer {
                     Token::Assign
                 }
             }
+            b'"' => Token::TString(self.read_string()),
             b';' => Token::Semicolon,
             b'(' => Token::Lparen,
             b')' => Token::Rparen,
@@ -168,6 +171,17 @@ impl Lexer {
         };
         self.read_char();
         Ok(tok)
+    }
+
+    fn read_string(&mut self) -> String {
+        let pos = self.pos + 1;
+        loop {
+            self.read_char();
+            if self.ch == b'"' || self.ch == 0 {
+                break;
+            }
+        }
+        return String::from_utf8_lossy(&self.input[pos..self.pos]).to_string();
     }
 
     fn read_ident(&mut self) -> String {
@@ -229,7 +243,10 @@ mod tests {
                 return false;
             }
             10 == 10;
-            10 != 9;"#;
+            10 != 9;
+            "foobar"
+            "foo bar"
+            "#;
 
         let mut l = Lexer::new(input.into());
         let tokens = vec![
@@ -306,6 +323,8 @@ mod tests {
             Token::NotEqual,
             Token::Int(String::from("9")),
             Token::Semicolon,
+            Token::TString(String::from("foobar")),
+            Token::TString(String::from("foo bar")),
             Token::Eof,
         ];
         for token in tokens {

@@ -63,6 +63,10 @@ impl Parser {
             Token::Function,
             PrefixParseFn::Mut(Parser::parse_fn_literal),
         );
+        p.register_prefix(
+            Token::TString("".to_string()),
+            PrefixParseFn::Ref(Parser::parse_string_literal),
+        );
         p.register_infix(Token::Plus, Parser::parse_infix_expression);
         p.register_infix(Token::Minus, Parser::parse_infix_expression);
         p.register_infix(Token::Slash, Parser::parse_infix_expression);
@@ -140,6 +144,10 @@ impl Parser {
 
     fn parse_identifier(&self) -> Expression {
         Expression::Id(self.cur_token.clone())
+    }
+
+    fn parse_string_literal(&self) -> Expression {
+        Expression::StringLit(StringLiteral::new(self.cur_token.clone()))
     }
 
     fn parse_integer_literal(&self) -> Expression {
@@ -408,6 +416,7 @@ impl ToString for Statement {
                     Expression::Infix(ie) => ie.to_string(),
                     Expression::IntLit(ile) => ile.token.to_string(),
                     Expression::BoolLit(ble) => ble.token.to_string(),
+                    Expression::StringLit(sle) => sle.token.to_string(),
                     Expression::If(ife) => ife.to_string(),
                     Expression::Id(ide) => ide.to_string(),
                     Expression::Fn(fe) => fe.to_string(),
@@ -426,6 +435,7 @@ pub enum Expression {
     Infix(InfixExpression),
     IntLit(IntegerLiteral),
     BoolLit(BooleanLiteral),
+    StringLit(StringLiteral),
     If(If),
     Id(Token),
     Fn(FunctionLiteral),
@@ -439,6 +449,7 @@ impl ToString for Expression {
             Expression::Infix(ie) => ie.to_string(),
             Expression::IntLit(ile) => ile.token.to_string(),
             Expression::BoolLit(ble) => ble.token.to_string(),
+            Expression::StringLit(sle) => sle.token.to_string(),
             Expression::If(ife) => ife.to_string(),
             Expression::Id(ide) => ide.to_string(),
             Expression::Fn(fe) => fe.to_string(),
@@ -458,6 +469,22 @@ impl ExpressionStatement {
         ExpressionStatement {
             token,
             expression: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StringLiteral {
+    pub token: Token,
+    pub value: String,
+}
+
+impl StringLiteral {
+    fn new(token: Token) -> Self {
+        let Token::TString(s) = token.clone() else {panic!("This is not a string")};
+        StringLiteral {
+            token,
+            value: s.parse().unwrap(),
         }
     }
 }
@@ -738,6 +765,7 @@ impl ToString for PrefixExpression {
                 Expression::Infix(i) => i.to_string(),
                 Expression::IntLit(il) => il.token.to_string(),
                 Expression::BoolLit(ble) => ble.token.to_string(),
+                Expression::StringLit(sle) => sle.token.to_string(),
                 Expression::If(ife) => ife.to_string(),
                 Expression::Id(id) => id.to_string(),
                 Expression::Fn(fe) => fe.to_string(),
@@ -1048,6 +1076,7 @@ pub fn test_integer_literal(il: Expression, value: isize) -> bool {
         }
         Expression::Fn(_) => panic!("can't have a function holding an int"),
         Expression::Call(_) => panic!("can't have a call holding an int"),
+        Expression::StringLit(_) => panic!("can't have a string holding an int"),
     }
     true
 }
@@ -1439,4 +1468,34 @@ pub fn test_call_expression() {
         }
     }
     println!("Passed test parse call expression")
+}
+
+pub fn test_string_literal_expression() {
+    let input = "\"hello world\"";
+    let l = Lexer::new(input.to_string());
+    let mut p = Parser::new(l);
+    let program = p.parse_program();
+    let errors = p.check_errors();
+    if errors {
+        process::exit(1);
+    }
+    if let Some(prog) = program {
+        match &prog.statements[0] {
+            Statement::Expression(e) => match *e.expression.clone().unwrap() {
+                Expression::StringLit(sle) => {
+                    assert_eq!(
+                        sle.value, "hello world",
+                        "value not 'hello world' got {}",
+                        sle.value
+                    )
+                }
+                _ => println!(
+                    "expr is not a string, got {}",
+                    e.expression.clone().unwrap().to_string()
+                ),
+            },
+            _ => println!("Not an expr, got {}", prog.statements[0].to_string()),
+        }
+    }
+    println!("Passed test string literal expression");
 }

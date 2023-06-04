@@ -19,6 +19,9 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
                     false => FALSE,
                 }
             }
+            Expression::StringLit(sle) => {
+                return Object::String(object::OString { value: sle.value })
+            }
             Expression::Prefix(pe) => {
                 let right = eval(Node::Expr(*pe.right.unwrap()), env);
                 if is_error(right.clone()) {
@@ -92,10 +95,7 @@ pub fn apply_function(func: Object, args: Vec<Object>) -> Object {
     match func {
         Object::Func(f) => {
             let mut extended_env = extend_function_env(f.clone(), args);
-            let evaluated = eval(
-                Node::Stmt(Statement::Block(f.body)),
-                &mut extended_env,
-            );
+            let evaluated = eval(Node::Stmt(Statement::Block(f.body)), &mut extended_env);
             unwrap_return_value(evaluated)
         }
         _ => {
@@ -589,4 +589,23 @@ pub fn test_closures() {
         "#;
     test_int_object(test_eval(input.to_string()).unwrap(), 4);
     println!("Passed test closures");
+}
+
+pub fn test_string_literal() {
+    let input = "\"Hello World!\"";
+    let evaluated = test_eval(input.to_string());
+    match evaluated.clone().unwrap() {
+        Object::String(s) => {
+            assert_eq!(
+                s.value, "Hello World!",
+                "string has wrong value, got {}",
+                s.value
+            )
+        }
+        _ => println!(
+            "Not a string, got {}",
+            evaluated.clone().unwrap().to_string()
+        ),
+    }
+    println!("Passed test string literal")
 }

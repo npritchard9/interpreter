@@ -4,6 +4,7 @@ use crate::{environment::Environment, lexer::Token, parser::BlockStatement};
 pub enum Object {
     Int(Integer),
     Bool(Bool),
+    String(OString),
     Return(Return),
     Func(Function),
     Error(Err),
@@ -15,6 +16,7 @@ impl ToString for Object {
         match self {
             Object::Int(i) => format!("{}", i.value),
             Object::Bool(b) => format!("{}", b.value),
+            Object::String(s) => format!("{}", s.value),
             Object::Null => "".to_string(),
             Object::Return(r) => r.value.to_string(),
             Object::Error(e) => e.to_string(),
@@ -28,6 +30,7 @@ impl Object {
         match self {
             Object::Int(_) => String::from("INTEGER"),
             Object::Bool(_) => String::from("BOOLEAN"),
+            Object::String(_) => String::from("STRING"),
             Object::Return(_) => String::from("RETURN"),
             Object::Error(e) => e.to_string(),
             Object::Null => String::from("NULL"),
@@ -44,6 +47,17 @@ pub struct Integer {
 impl Integer {
     pub fn get_type() -> String {
         String::from("Integer")
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct OString {
+    pub value: String,
+}
+
+impl OString {
+    pub fn get_type() -> String {
+        String::from("String")
     }
 }
 

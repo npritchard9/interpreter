@@ -7,7 +7,7 @@ mod repl;
 
 fn main() {
     // let env = Environment::new();
-    repl::start();
+    // repl::start();
     // parser::test_let_statements();
     // parser::test_return_statements();
     // parser::test_string();
@@ -31,4 +31,6 @@ fn main() {
     // eval::test_function_object();
     // eval::test_function_application();
     // eval::test_closures();
+    parser::test_string_literal_expression();
+    eval::test_string_literal();
 }
