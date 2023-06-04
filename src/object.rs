@@ -12,7 +12,7 @@ impl ToString for Object {
         match self {
             Object::Int(i) => format!("{}", i.value),
             Object::Bool(b) => format!("{}", b.value),
-            Object::Null => "null".to_string(),
+            Object::Null => "".to_string(),
             Object::Return(r) => r.value.to_string(),
             Object::Error(e) => e.to_string(),
         }

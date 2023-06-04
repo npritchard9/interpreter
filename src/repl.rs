@@ -18,7 +18,7 @@ pub fn start() {
         let program = p.parse_program();
         if let Some(prog) = program {
             let e = eval(Node::Prog(prog.clone()), &mut env);
-            println!("{}", e.to_string());
+            print!("{}", e.to_string());
             print!("\n>> ");
             stdout().flush().unwrap();
         }
