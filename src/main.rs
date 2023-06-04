@@ -1,5 +1,3 @@
-
-
 mod environment;
 mod eval;
 mod lexer;
@@ -30,4 +28,7 @@ fn main() {
     // eval::test_if_else_expression();
     // eval::test_return_statements();
     // eval::test_error_handling(env);
+    // eval::test_function_object();
+    // eval::test_function_application();
+    // eval::test_closures();
 }

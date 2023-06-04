@@ -2,27 +2,39 @@ use std::collections::HashMap;
 
 use crate::object::Object;
 
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Environment {
-    store: HashMap<String, Object>,
+    pub store: HashMap<String, Object>,
+    pub outer: Option<Box<Environment>>,
 }
 
 impl Environment {
     pub fn new() -> Self {
         Environment {
             store: HashMap::new(),
+            outer: None,
         }
     }
 
-    pub fn get(&self, k: String) -> Option<&Object> {
-        self.store.get(&k)
+    pub fn get(&self, k: String) -> Option<Object> {
+        match self.store.get(&k) {
+            Some(v) => Some(v.clone()),
+            None => {
+                if let Some(out) = self.outer.clone() {
+                    return out.get(k);
+                }
+                None
+            }
+        }
     }
 
     pub fn set(&mut self, k: String, v: Object) -> Option<Object> {
         self.store.insert(k, v)
     }
+}
 
-    pub fn show(&self) {
-        println!("env: {:#?}", self.store);
-    }
+pub fn new_enclosed_env(outer: Environment) -> Environment {
+    let mut env = Environment::new();
+    env.outer = Some(Box::new(outer));
+    env
 }

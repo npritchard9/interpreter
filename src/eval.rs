@@ -1,7 +1,7 @@
 use crate::{
-    environment::Environment,
+    environment::{new_enclosed_env, Environment},
     lexer::{Lexer, Token},
-    object::{self, Bool, Err, Integer, Object},
+    object::{self, Bool, Err, Function, Integer, Object},
     parser::{BlockStatement, Expression, If, Node, Parser, Program, Statement},
 };
 
@@ -38,8 +38,27 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
                 return eval_infix_expression(ie.op, left, right);
             }
             Expression::If(ife) => return eval_if_expression(ife, env),
+            Expression::Fn(fne) => {
+                let params = fne.params;
+                let body = fne.body;
+                return Object::Func(Function {
+                    params,
+                    env: env.clone(),
+                    body,
+                });
+            }
+            Expression::Call(ce) => {
+                let func = eval(Node::Expr(*ce.func), env);
+                if is_error(func.clone()) {
+                    return func.clone();
+                }
+                let args = eval_expressions(ce.args, env);
+                if args.len() == 1 && is_error(args[0].clone()) {
+                    return args[0].clone();
+                }
+                return apply_function(func.clone(), args);
+            }
             Expression::Id(ide) => return eval_ident(ide, env),
-            _ => println!("not an int lit, got {}", e.to_string()),
         },
         Node::Prog(p) => return eval_program(p, env),
         Node::Stmt(s) => match s {
@@ -67,6 +86,50 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
         },
     }
     NULL
+}
+
+pub fn apply_function(func: Object, args: Vec<Object>) -> Object {
+    match func {
+        Object::Func(f) => {
+            let mut extended_env = extend_function_env(f.clone(), args);
+            let evaluated = eval(
+                Node::Stmt(Statement::Block(f.body.clone())),
+                &mut extended_env,
+            );
+            return unwrap_return_value(evaluated);
+        }
+        _ => {
+            let msg = format!("not a function: {}", func.get_type());
+            return Object::Error(Err { msg });
+        }
+    }
+}
+
+pub fn extend_function_env(func: Function, args: Vec<Object>) -> Environment {
+    let mut env = new_enclosed_env(func.env);
+    for (i, p) in func.params.iter().enumerate() {
+        env.set(p.to_string(), args[i].clone());
+    }
+    return env;
+}
+
+pub fn unwrap_return_value(obj: Object) -> Object {
+    match obj {
+        Object::Return(r) => *r.value,
+        _ => obj,
+    }
+}
+
+pub fn eval_expressions(exps: Vec<Option<Box<Expression>>>, env: &mut Environment) -> Vec<Object> {
+    let mut res = Vec::new();
+    for e in exps.iter() {
+        let evaluated = eval(Node::Expr(*e.clone().unwrap()), env);
+        if is_error(evaluated.clone()) {
+            return vec![evaluated];
+        }
+        res.push(evaluated);
+    }
+    res
 }
 
 pub fn eval_ident(token: Token, env: &mut Environment) -> Object {
@@ -473,4 +536,57 @@ pub fn test_let_statements(_env: &mut Environment) {
     for t in tests {
         test_int_object(test_eval(t.0.to_string()).unwrap(), t.1);
     }
+}
+
+pub fn test_function_object() {
+    let input = "fn(x) { x + 2; };";
+    let evaluated = test_eval(input.to_string());
+    if let Some(e) = evaluated {
+        match e {
+            Object::Func(f) => {
+                assert_eq!(f.params.len(), 1, "fn has wrong params, got {:?}", f.params);
+                assert_eq!(
+                    f.params[0].to_string(),
+                    "x",
+                    "param is not x, got {}",
+                    f.params[0].to_string()
+                );
+                assert_eq!(
+                    f.body.to_string(),
+                    "(x + 2)",
+                    "body is wrong, got {}",
+                    f.body.to_string()
+                )
+            }
+            _ => println!("obj not a function, got {}", e.to_string()),
+        }
+    }
+    println!("Passed test function object")
+}
+
+pub fn test_function_application() {
+    let tests = vec![
+        ("let identity = fn(x) { x; }; identity(5);", 5),
+        ("let identity = fn(x) { return x; }; identity(5);", 5),
+        ("let double = fn(x) { x * 2; }; double(5);", 10),
+        ("let add = fn(x, y) { x + y; }; add(5, 5);", 10),
+        ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20),
+        ("fn(x) { x; }(5)", 5),
+    ];
+    for t in tests {
+        test_int_object(test_eval(t.0.to_string()).unwrap(), t.1);
+    }
+    println!("Passed test function application");
+}
+
+pub fn test_closures() {
+    let input = r#"
+        let newAdder = fn(x) {
+            fn(y) { x + y };
+        };
+        let addTwo = newAdder(2);
+        addTwo(2);
+        "#;
+    test_int_object(test_eval(input.to_string()).unwrap(), 4);
+    println!("Passed test closures");
 }

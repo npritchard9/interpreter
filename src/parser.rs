@@ -413,7 +413,7 @@ impl ToString for Statement {
                     Expression::Fn(fe) => fe.to_string(),
                     Expression::Call(ce) => ce.to_string(),
                 },
-                None => todo!(),
+                None => String::from(""),
             },
             Statement::Block(b) => b.to_string(),
         }
@@ -816,9 +816,7 @@ pub fn test_let_statements() {
 
 fn test_let_statement(s: Statement, name: String) -> bool {
     match s {
-        Statement::Let(l) => {
-            l.name.to_string() == name
-        }
+        Statement::Let(l) => l.name.to_string() == name,
         _ => false,
     }
 }
