@@ -262,7 +262,7 @@ pub fn eval_string_infix_expression(op: String, left: OString, right: OString) -
     match op.as_str() {
         "+" => {
             left_val.push_str(right_val.as_str());
-            return Object::String(OString { value: left_val });
+            Object::String(OString { value: left_val })
         }
         _ => {
             let msg = format!(
@@ -640,7 +640,7 @@ pub fn test_string_literal() {
         }
         _ => println!(
             "Not a string, got {}",
-            evaluated.clone().unwrap().to_string()
+            evaluated.unwrap().to_string()
         ),
     }
     println!("Passed test string literal")
@@ -659,7 +659,7 @@ pub fn test_string_concat() {
         }
         _ => println!(
             "Not a string, got {}",
-            evaluated.clone().unwrap().to_string()
+            evaluated.unwrap().to_string()
         ),
     }
     println!("Passed test string concat")
