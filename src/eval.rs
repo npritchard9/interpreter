@@ -1,6 +1,7 @@
 use crate::{
-    lexer::Lexer,
-    object::{self, Bool, Err, Integer, Object, Return},
+    environment::Environment,
+    lexer::{Lexer, Token},
+    object::{self, Bool, Err, Integer, Object},
     parser::{BlockStatement, Expression, If, Node, Parser, Program, Statement},
 };
 
@@ -8,7 +9,7 @@ const TRUE: Object = Object::Bool(Bool { value: true });
 const FALSE: Object = Object::Bool(Bool { value: false });
 const NULL: Object = Object::Null;
 
-pub fn eval(node: Node) -> Object {
+pub fn eval(node: Node, mut env: &mut Environment) -> Object {
     match node {
         Node::Expr(e) => match e {
             Expression::IntLit(ile) => return Object::Int(Integer { value: ile.value }),
@@ -19,44 +20,76 @@ pub fn eval(node: Node) -> Object {
                 }
             }
             Expression::Prefix(pe) => {
-                let right = eval(Node::Expr(*pe.right.unwrap()));
+                let right = eval(Node::Expr(*pe.right.unwrap()), &mut env);
+                if is_error(right.clone()) {
+                    return right.clone();
+                }
                 return eval_prefix_expression(pe.op, right);
             }
             Expression::Infix(ie) => {
-                let left = eval(Node::Expr(*ie.left.unwrap()));
-                let right = eval(Node::Expr(*ie.right.unwrap()));
+                let left = eval(Node::Expr(*ie.left.unwrap()), &mut env);
+                if is_error(left.clone()) {
+                    return left.clone();
+                }
+                let right = eval(Node::Expr(*ie.right.unwrap()), &mut env);
+                if is_error(right.clone()) {
+                    return right.clone();
+                }
                 return eval_infix_expression(ie.op, left, right);
             }
-            Expression::If(ife) => return eval_if_expression(ife),
+            Expression::If(ife) => return eval_if_expression(ife, &mut env),
+            Expression::Id(ide) => return eval_ident(ide, &mut env),
             _ => println!("not an int lit, got {}", e.to_string()),
         },
-        Node::Prog(p) => return eval_program(p),
+        Node::Prog(p) => return eval_program(p, &mut env),
         Node::Stmt(s) => match s {
             Statement::Expression(es) => match es.expression {
-                Some(e) => return eval(Node::Expr(*e)),
+                Some(e) => return eval(Node::Expr(*e), &mut env),
                 None => return NULL,
             },
-            Statement::Block(bs) => return eval_block_statement(bs),
+            Statement::Block(bs) => return eval_block_statement(bs, &mut env),
             Statement::Return(rs) => {
-                let val = eval(Node::Expr(*rs.value.unwrap()));
+                let val = eval(Node::Expr(*rs.value.unwrap()), &mut env);
+                if is_error(val.clone()) {
+                    return val.clone();
+                }
                 return Object::Return(object::Return {
                     value: Box::new(val),
                 });
             }
-            _ => println!("not an expr stmt, got {}", s.to_string()),
+            Statement::Let(ls) => {
+                let val = eval(Node::Expr(*ls.value.unwrap()), &mut env);
+                if is_error(val.clone()) {
+                    return val.clone();
+                }
+                env.set(ls.name.to_string(), val);
+            }
         },
     }
     NULL
 }
 
-pub fn eval_if_expression(ife: If) -> Object {
+pub fn eval_ident(token: Token, env: &mut Environment) -> Object {
+    match env.get(token.to_string()) {
+        Some(v) => v.clone(),
+        None => {
+            let msg = format!("identifier not found: {}", token.to_string());
+            Object::Error(Err { msg })
+        }
+    }
+}
+
+pub fn eval_if_expression(ife: If, mut env: &mut Environment) -> Object {
     match ife.cond {
         Some(c) => {
-            let cond = eval(Node::Expr(*c));
+            let cond = eval(Node::Expr(*c), &mut env);
             if is_truthy(cond) {
-                return eval(Node::Stmt(Statement::Block(ife.consequence)));
+                return eval(Node::Stmt(Statement::Block(ife.consequence)), &mut env);
             } else if ife.alternative.is_some() {
-                return eval(Node::Stmt(Statement::Block(ife.alternative.unwrap())));
+                return eval(
+                    Node::Stmt(Statement::Block(ife.alternative.unwrap())),
+                    &mut env,
+                );
             } else {
                 NULL
             }
@@ -65,10 +98,10 @@ pub fn eval_if_expression(ife: If) -> Object {
     }
 }
 
-pub fn eval_block_statement(block: BlockStatement) -> Object {
+pub fn eval_block_statement(block: BlockStatement, mut env: &mut Environment) -> Object {
     let mut res = Object::Null;
     for s in block.statements {
-        res = eval(Node::Stmt(s));
+        res = eval(Node::Stmt(s), &mut env);
         match res {
             Object::Return(_) | Object::Error(_) => return res,
             _ => continue,
@@ -84,10 +117,17 @@ pub fn is_truthy(obj: Object) -> bool {
     }
 }
 
-pub fn eval_program(p: Program) -> Object {
+pub fn is_error(obj: Object) -> bool {
+    match obj {
+        Object::Error(_) => true,
+        _ => false,
+    }
+}
+
+pub fn eval_program(p: Program, mut env: &mut Environment) -> Object {
     let mut res = Object::Null;
     for s in p.statements {
-        res = eval(Node::Stmt(s));
+        res = eval(Node::Stmt(s), &mut env);
         match res.clone() {
             Object::Return(r) => return *r.value,
             Object::Error(_) => return res.clone(),
@@ -228,7 +268,7 @@ pub fn eval_minus_prefix_op_expression(right: Object) -> Object {
 
 // TESTS
 
-pub fn test_eval_int_expression() {
+pub fn test_eval_int_expression(env: &mut Environment) {
     let tests = vec![
         ("5", 5),
         ("10", 10),
@@ -259,8 +299,9 @@ pub fn test_eval(input: String) -> Option<Object> {
     let l = Lexer::new(input);
     let mut p = Parser::new(l);
     let program = p.parse_program();
+    let mut e = Environment::new();
     if let Some(prog) = program {
-        Some(eval(Node::Prog(prog)))
+        Some(eval(Node::Prog(prog), &mut e))
     } else {
         None
     }
@@ -282,7 +323,7 @@ pub fn test_int_object(obj: Object, expected: isize) -> bool {
     true
 }
 
-pub fn test_eval_bool_expression() {
+pub fn test_eval_bool_expression(env: &mut Environment) {
     let tests = vec![
         ("true", true),
         ("false", false),
@@ -329,7 +370,7 @@ pub fn test_bool_object(obj: Object, expected: bool) -> bool {
     true
 }
 
-pub fn test_bang_operator() {
+pub fn test_bang_operator(env: &mut Environment) {
     let tests = vec![
         ("!true", false),
         ("!false", true),
@@ -345,7 +386,7 @@ pub fn test_bang_operator() {
     println!("Passed test bang op");
 }
 
-pub fn test_if_else_expression() {
+pub fn test_if_else_expression(env: &mut Environment) {
     enum IfElseRes {
         Int(isize),
         Obj(Object),
@@ -384,7 +425,7 @@ pub fn test_null_object(obj: Object) -> bool {
     false
 }
 
-pub fn test_return_statements() {
+pub fn test_return_statements(env: &mut Environment) {
     let tests = vec![
         ("return 10;", 10),
         ("return 10; 9;", 10),
@@ -411,7 +452,7 @@ pub fn test_return_statements() {
     println!("Passed test return statements")
 }
 
-pub fn test_error_handling() {
+pub fn test_error_handling(env: &mut Environment) {
     let tests = vec![
         ("5 + true;", "type mismatch: INTEGER + BOOLEAN"),
         ("5 + true; 5;", "type mismatch: INTEGER + BOOLEAN"),
@@ -431,6 +472,7 @@ pub fn test_error_handling() {
             }"#,
             "unknown operator: BOOLEAN + BOOLEAN",
         ),
+        ("foobar", "identifier not found: foobar"),
     ];
 
     for t in tests {
@@ -450,4 +492,16 @@ pub fn test_error_handling() {
         }
     }
     println!("Passed test error handling")
+}
+
+pub fn test_let_statements(env: &mut Environment) {
+    let tests = vec![
+        ("let a = 5; a;", 5),
+        ("let a = 5 * 5; a;", 25),
+        ("let a = 5; let b = a; b;", 5),
+        ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
+    ];
+    for t in tests {
+        test_int_object(test_eval(t.0.to_string()).unwrap(), t.1);
+    }
 }

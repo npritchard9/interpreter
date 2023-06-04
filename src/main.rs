@@ -1,3 +1,6 @@
+use environment::Environment;
+
+mod environment;
 mod eval;
 mod lexer;
 mod object;
@@ -5,6 +8,7 @@ mod parser;
 mod repl;
 
 fn main() {
+    // let env = Environment::new();
     repl::start();
     // parser::test_let_statements();
     // parser::test_return_statements();
@@ -25,5 +29,5 @@ fn main() {
     // eval::test_bang_operator();
     // eval::test_if_else_expression();
     // eval::test_return_statements();
-    // eval::test_error_handling();
+    // eval::test_error_handling(env);
 }
