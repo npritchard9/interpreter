@@ -46,7 +46,7 @@ pub struct Integer {
 
 impl Integer {
     pub fn get_type() -> String {
-        String::from("Integer")
+        String::from("INTEGER")
     }
 }
 
@@ -57,7 +57,7 @@ pub struct OString {
 
 impl OString {
     pub fn get_type() -> String {
-        String::from("String")
+        String::from("STRING")
     }
 }
 
@@ -68,7 +68,7 @@ pub struct Bool {
 
 impl Bool {
     fn get_type() -> String {
-        String::from("Bool")
+        String::from("BOOLEAN")
     }
 }
 

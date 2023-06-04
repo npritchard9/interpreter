@@ -1,7 +1,7 @@
 use crate::{
     environment::{new_enclosed_env, Environment},
     lexer::{Lexer, Token},
-    object::{self, Bool, Err, Function, Integer, Object},
+    object::{self, Bool, Err, Function, Integer, OString, Object},
     parser::{BlockStatement, Expression, If, Node, Parser, Program, Statement},
 };
 
@@ -230,6 +230,18 @@ pub fn eval_infix_expression(op: String, left: Object, right: Object) -> Object 
                     Object::Error(Err { msg })
                 }
             },
+            Object::String(ref ls) => match right {
+                Object::String(rs) => eval_string_infix_expression(op, ls.clone(), rs),
+                _ => {
+                    let msg = format!(
+                        "type mismatch: {} {} {}",
+                        left.get_type(),
+                        op,
+                        right.get_type()
+                    );
+                    Object::Error(Err { msg })
+                }
+            },
             _ => {
                 // check this msg val
                 let msg = format!(
@@ -241,6 +253,26 @@ pub fn eval_infix_expression(op: String, left: Object, right: Object) -> Object 
                 Object::Error(Err { msg })
             }
         },
+    }
+}
+
+pub fn eval_string_infix_expression(op: String, left: OString, right: OString) -> Object {
+    let mut left_val = left.value;
+    let right_val = right.value;
+    match op.as_str() {
+        "+" => {
+            left_val.push_str(right_val.as_str());
+            return Object::String(OString { value: left_val });
+        }
+        _ => {
+            let msg = format!(
+                "unknown operator: {} {} {}",
+                OString::get_type(),
+                op,
+                OString::get_type()
+            );
+            Object::Error(Err { msg })
+        }
     }
 }
 
@@ -505,6 +537,10 @@ pub fn test_error_handling(_env: &mut Environment) {
             "unknown operator: BOOLEAN + BOOLEAN",
         ),
         ("foobar", "identifier not found: foobar"),
+        (
+            "\"Hello\" - \"World!\"",
+            "unknown operator: STRING - STRING",
+        ),
     ];
 
     for t in tests {
@@ -608,4 +644,23 @@ pub fn test_string_literal() {
         ),
     }
     println!("Passed test string literal")
+}
+
+pub fn test_string_concat() {
+    let input = "\"Hello\" + \" \" + \"World!\"";
+    let evaluated = test_eval(input.to_string());
+    match evaluated.clone().unwrap() {
+        Object::String(s) => {
+            assert_eq!(
+                s.value, "Hello World!",
+                "string has wrong value, got {}",
+                s.value
+            )
+        }
+        _ => println!(
+            "Not a string, got {}",
+            evaluated.clone().unwrap().to_string()
+        ),
+    }
+    println!("Passed test string concat")
 }
