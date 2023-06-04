@@ -50,13 +50,13 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
             Expression::Call(ce) => {
                 let func = eval(Node::Expr(*ce.func), env);
                 if is_error(func.clone()) {
-                    return func.clone();
+                    return func;
                 }
                 let args = eval_expressions(ce.args, env);
                 if args.len() == 1 && is_error(args[0].clone()) {
                     return args[0].clone();
                 }
-                return apply_function(func.clone(), args);
+                return apply_function(func, args);
             }
             Expression::Id(ide) => return eval_ident(ide, env),
         },
@@ -93,14 +93,14 @@ pub fn apply_function(func: Object, args: Vec<Object>) -> Object {
         Object::Func(f) => {
             let mut extended_env = extend_function_env(f.clone(), args);
             let evaluated = eval(
-                Node::Stmt(Statement::Block(f.body.clone())),
+                Node::Stmt(Statement::Block(f.body)),
                 &mut extended_env,
             );
-            return unwrap_return_value(evaluated);
+            unwrap_return_value(evaluated)
         }
         _ => {
             let msg = format!("not a function: {}", func.get_type());
-            return Object::Error(Err { msg });
+            Object::Error(Err { msg })
         }
     }
 }
@@ -110,7 +110,7 @@ pub fn extend_function_env(func: Function, args: Vec<Object>) -> Environment {
     for (i, p) in func.params.iter().enumerate() {
         env.set(p.to_string(), args[i].clone());
     }
-    return env;
+    env
 }
 
 pub fn unwrap_return_value(obj: Object) -> Object {
@@ -134,7 +134,7 @@ pub fn eval_expressions(exps: Vec<Option<Box<Expression>>>, env: &mut Environmen
 
 pub fn eval_ident(token: Token, env: &mut Environment) -> Object {
     match env.get(token.to_string()) {
-        Some(v) => v.clone(),
+        Some(v) => v,
         None => {
             let msg = format!("identifier not found: {}", token.to_string());
             Object::Error(Err { msg })
