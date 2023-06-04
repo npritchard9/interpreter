@@ -9,7 +9,7 @@ const TRUE: Object = Object::Bool(Bool { value: true });
 const FALSE: Object = Object::Bool(Bool { value: false });
 const NULL: Object = Object::Null;
 
-pub fn eval(node: Node, mut env: &mut Environment) -> Object {
+pub fn eval(node: Node, env: &mut Environment) -> Object {
     match node {
         Node::Expr(e) => match e {
             Expression::IntLit(ile) => return Object::Int(Integer { value: ile.value }),
@@ -20,47 +20,47 @@ pub fn eval(node: Node, mut env: &mut Environment) -> Object {
                 }
             }
             Expression::Prefix(pe) => {
-                let right = eval(Node::Expr(*pe.right.unwrap()), &mut env);
+                let right = eval(Node::Expr(*pe.right.unwrap()), env);
                 if is_error(right.clone()) {
-                    return right.clone();
+                    return right;
                 }
                 return eval_prefix_expression(pe.op, right);
             }
             Expression::Infix(ie) => {
-                let left = eval(Node::Expr(*ie.left.unwrap()), &mut env);
+                let left = eval(Node::Expr(*ie.left.unwrap()), env);
                 if is_error(left.clone()) {
-                    return left.clone();
+                    return left;
                 }
-                let right = eval(Node::Expr(*ie.right.unwrap()), &mut env);
+                let right = eval(Node::Expr(*ie.right.unwrap()), env);
                 if is_error(right.clone()) {
-                    return right.clone();
+                    return right;
                 }
                 return eval_infix_expression(ie.op, left, right);
             }
-            Expression::If(ife) => return eval_if_expression(ife, &mut env),
-            Expression::Id(ide) => return eval_ident(ide, &mut env),
+            Expression::If(ife) => return eval_if_expression(ife, env),
+            Expression::Id(ide) => return eval_ident(ide, env),
             _ => println!("not an int lit, got {}", e.to_string()),
         },
-        Node::Prog(p) => return eval_program(p, &mut env),
+        Node::Prog(p) => return eval_program(p, env),
         Node::Stmt(s) => match s {
             Statement::Expression(es) => match es.expression {
-                Some(e) => return eval(Node::Expr(*e), &mut env),
+                Some(e) => return eval(Node::Expr(*e), env),
                 None => return NULL,
             },
-            Statement::Block(bs) => return eval_block_statement(bs, &mut env),
+            Statement::Block(bs) => return eval_block_statement(bs, env),
             Statement::Return(rs) => {
-                let val = eval(Node::Expr(*rs.value.unwrap()), &mut env);
+                let val = eval(Node::Expr(*rs.value.unwrap()), env);
                 if is_error(val.clone()) {
-                    return val.clone();
+                    return val;
                 }
                 return Object::Return(object::Return {
                     value: Box::new(val),
                 });
             }
             Statement::Let(ls) => {
-                let val = eval(Node::Expr(*ls.value.unwrap()), &mut env);
+                let val = eval(Node::Expr(*ls.value.unwrap()), env);
                 if is_error(val.clone()) {
-                    return val.clone();
+                    return val;
                 }
                 env.set(ls.name.to_string(), val);
             }
@@ -79,17 +79,14 @@ pub fn eval_ident(token: Token, env: &mut Environment) -> Object {
     }
 }
 
-pub fn eval_if_expression(ife: If, mut env: &mut Environment) -> Object {
+pub fn eval_if_expression(ife: If, env: &mut Environment) -> Object {
     match ife.cond {
         Some(c) => {
-            let cond = eval(Node::Expr(*c), &mut env);
+            let cond = eval(Node::Expr(*c), env);
             if is_truthy(cond) {
-                return eval(Node::Stmt(Statement::Block(ife.consequence)), &mut env);
+                eval(Node::Stmt(Statement::Block(ife.consequence)), env)
             } else if ife.alternative.is_some() {
-                return eval(
-                    Node::Stmt(Statement::Block(ife.alternative.unwrap())),
-                    &mut env,
-                );
+                return eval(Node::Stmt(Statement::Block(ife.alternative.unwrap())), env);
             } else {
                 NULL
             }
@@ -98,16 +95,16 @@ pub fn eval_if_expression(ife: If, mut env: &mut Environment) -> Object {
     }
 }
 
-pub fn eval_block_statement(block: BlockStatement, mut env: &mut Environment) -> Object {
+pub fn eval_block_statement(block: BlockStatement, env: &mut Environment) -> Object {
     let mut res = Object::Null;
     for s in block.statements {
-        res = eval(Node::Stmt(s), &mut env);
+        res = eval(Node::Stmt(s), env);
         match res {
             Object::Return(_) | Object::Error(_) => return res,
             _ => continue,
         }
     }
-    return res;
+    res
 }
 
 pub fn is_truthy(obj: Object) -> bool {
@@ -118,19 +115,16 @@ pub fn is_truthy(obj: Object) -> bool {
 }
 
 pub fn is_error(obj: Object) -> bool {
-    match obj {
-        Object::Error(_) => true,
-        _ => false,
-    }
+    matches!(obj, Object::Error(_))
 }
 
-pub fn eval_program(p: Program, mut env: &mut Environment) -> Object {
+pub fn eval_program(p: Program, env: &mut Environment) -> Object {
     let mut res = Object::Null;
     for s in p.statements {
-        res = eval(Node::Stmt(s), &mut env);
+        res = eval(Node::Stmt(s), env);
         match res.clone() {
             Object::Return(r) => return *r.value,
-            Object::Error(_) => return res.clone(),
+            Object::Error(_) => return res,
             _ => continue,
         }
     }
@@ -139,28 +133,26 @@ pub fn eval_program(p: Program, mut env: &mut Environment) -> Object {
 
 pub fn eval_prefix_expression(op: String, right: Object) -> Object {
     match op.as_str() {
-        "!" => return eval_bang_op_expression(right),
-        "-" => return eval_minus_prefix_op_expression(right),
+        "!" => eval_bang_op_expression(right),
+        "-" => eval_minus_prefix_op_expression(right),
         _ => {
             // check this msg val
             let msg = format!("unknown operator: {}{}", op, right.get_type());
-            return Object::Error(Err { msg });
+            Object::Error(Err { msg })
         }
     }
 }
 
 pub fn eval_infix_expression(op: String, left: Object, right: Object) -> Object {
     match op.as_str() {
-        "==" => {
-            return Object::Bool(Bool {
-                value: left == right,
-            })
-        }
+        "==" => Object::Bool(Bool {
+            value: left == right,
+        }),
         "!=" => {
             // should change this to use bool func
-            return Object::Bool(Bool {
+            Object::Bool(Bool {
                 value: left != right,
-            });
+            })
         }
         _ => match left {
             Object::Int(li) => match right {
@@ -172,7 +164,7 @@ pub fn eval_infix_expression(op: String, left: Object, right: Object) -> Object 
                         op,
                         right.get_type()
                     );
-                    return Object::Error(Err { msg });
+                    Object::Error(Err { msg })
                 }
             },
             _ => {
@@ -183,7 +175,7 @@ pub fn eval_infix_expression(op: String, left: Object, right: Object) -> Object 
                     op,
                     right.get_type()
                 );
-                return Object::Error(Err { msg });
+                Object::Error(Err { msg })
             }
         },
     }
@@ -193,46 +185,30 @@ pub fn eval_int_infix_expression(op: String, left: Integer, right: Integer) -> O
     let left_val = left.value;
     let right_val = right.value;
     match op.as_str() {
-        "+" => {
-            return Object::Int(Integer {
-                value: left_val + right_val,
-            })
-        }
-        "-" => {
-            return Object::Int(Integer {
-                value: left_val - right_val,
-            })
-        }
-        "*" => {
-            return Object::Int(Integer {
-                value: left_val * right_val,
-            })
-        }
-        "/" => {
-            return Object::Int(Integer {
-                value: left_val / right_val,
-            })
-        }
-        "<" => {
-            return Object::Bool(Bool {
-                value: left_val < right_val,
-            })
-        }
-        ">" => {
-            return Object::Bool(Bool {
-                value: left_val > right_val,
-            })
-        }
-        "==" => {
-            return Object::Bool(Bool {
-                value: left_val == right_val,
-            })
-        }
-        "!=" => {
-            return Object::Bool(Bool {
-                value: left_val != right_val,
-            })
-        }
+        "+" => Object::Int(Integer {
+            value: left_val + right_val,
+        }),
+        "-" => Object::Int(Integer {
+            value: left_val - right_val,
+        }),
+        "*" => Object::Int(Integer {
+            value: left_val * right_val,
+        }),
+        "/" => Object::Int(Integer {
+            value: left_val / right_val,
+        }),
+        "<" => Object::Bool(Bool {
+            value: left_val < right_val,
+        }),
+        ">" => Object::Bool(Bool {
+            value: left_val > right_val,
+        }),
+        "==" => Object::Bool(Bool {
+            value: left_val == right_val,
+        }),
+        "!=" => Object::Bool(Bool {
+            value: left_val != right_val,
+        }),
         _ => {
             let msg = format!(
                 "unknown operator: {} {} {}",
@@ -268,7 +244,7 @@ pub fn eval_minus_prefix_op_expression(right: Object) -> Object {
 
 // TESTS
 
-pub fn test_eval_int_expression(env: &mut Environment) {
+pub fn test_eval_int_expression(_env: &mut Environment) {
     let tests = vec![
         ("5", 5),
         ("10", 10),
@@ -300,11 +276,7 @@ pub fn test_eval(input: String) -> Option<Object> {
     let mut p = Parser::new(l);
     let program = p.parse_program();
     let mut e = Environment::new();
-    if let Some(prog) = program {
-        Some(eval(Node::Prog(prog), &mut e))
-    } else {
-        None
-    }
+    program.map(|prog| eval(Node::Prog(prog), &mut e))
 }
 
 pub fn test_int_object(obj: Object, expected: isize) -> bool {
@@ -323,7 +295,7 @@ pub fn test_int_object(obj: Object, expected: isize) -> bool {
     true
 }
 
-pub fn test_eval_bool_expression(env: &mut Environment) {
+pub fn test_eval_bool_expression(_env: &mut Environment) {
     let tests = vec![
         ("true", true),
         ("false", false),
@@ -370,7 +342,7 @@ pub fn test_bool_object(obj: Object, expected: bool) -> bool {
     true
 }
 
-pub fn test_bang_operator(env: &mut Environment) {
+pub fn test_bang_operator(_env: &mut Environment) {
     let tests = vec![
         ("!true", false),
         ("!false", true),
@@ -386,7 +358,7 @@ pub fn test_bang_operator(env: &mut Environment) {
     println!("Passed test bang op");
 }
 
-pub fn test_if_else_expression(env: &mut Environment) {
+pub fn test_if_else_expression(_env: &mut Environment) {
     enum IfElseRes {
         Int(isize),
         Obj(Object),
@@ -404,14 +376,12 @@ pub fn test_if_else_expression(env: &mut Environment) {
     for t in tests {
         let evaluated = test_eval(t.0.to_string());
         match t.1 {
-            Int(i) => assert_eq!(
+            Int(i) => assert!(
                 test_int_object(evaluated.unwrap(), i),
-                true,
                 "didnt get true for int object"
             ),
-            Obj(_) => assert_eq!(
+            Obj(_) => assert!(
                 test_null_object(evaluated.unwrap()),
-                true,
                 "didnt get true for null object"
             ),
         }
@@ -425,7 +395,7 @@ pub fn test_null_object(obj: Object) -> bool {
     false
 }
 
-pub fn test_return_statements(env: &mut Environment) {
+pub fn test_return_statements(_env: &mut Environment) {
     let tests = vec![
         ("return 10;", 10),
         ("return 10; 9;", 10),
@@ -443,16 +413,15 @@ pub fn test_return_statements(env: &mut Environment) {
     ];
     for t in tests {
         let evaluated = test_eval(t.0.to_string());
-        assert_eq!(
+        assert!(
             test_int_object(evaluated.unwrap(), t.1),
-            true,
             "didnt get true for return"
         )
     }
     println!("Passed test return statements")
 }
 
-pub fn test_error_handling(env: &mut Environment) {
+pub fn test_error_handling(_env: &mut Environment) {
     let tests = vec![
         ("5 + true;", "type mismatch: INTEGER + BOOLEAN"),
         ("5 + true; 5;", "type mismatch: INTEGER + BOOLEAN"),
@@ -494,7 +463,7 @@ pub fn test_error_handling(env: &mut Environment) {
     println!("Passed test error handling")
 }
 
-pub fn test_let_statements(env: &mut Environment) {
+pub fn test_let_statements(_env: &mut Environment) {
     let tests = vec![
         ("let a = 5; a;", 5),
         ("let a = 5 * 5; a;", 25),

@@ -291,10 +291,10 @@ impl Parser {
     fn expect_peek(&mut self, t: Token) -> bool {
         if self.peek_token_is(t.clone()) {
             self.next_token();
-            return true;
+            true
         } else {
             self.peek_error(t);
-            return false;
+            false
         }
     }
 
@@ -357,10 +357,10 @@ impl Parser {
                 self.next_token();
                 left_exp = infix(self, left_exp);
             }
-            return Some(Box::new(left_exp));
+            Some(Box::new(left_exp))
         } else {
             self.no_prefix_parse_fn_error(self.cur_token.clone());
-            return None;
+            None
         }
     }
 
@@ -382,9 +382,9 @@ impl Parser {
             self.next_token();
         }
         if program.statements.is_empty() {
-            return None;
+            None
         } else {
-            return Some(program);
+            Some(program)
         }
     }
 }
@@ -456,7 +456,7 @@ pub struct ExpressionStatement {
 impl ExpressionStatement {
     fn new(token: Token) -> Self {
         ExpressionStatement {
-            token: token.clone(),
+            token,
             expression: None,
         }
     }
@@ -574,7 +574,7 @@ pub struct CallExpression {
 impl CallExpression {
     fn new(token: Token, func: Expression) -> Self {
         CallExpression {
-            token: token.clone(),
+            token,
             func: Box::new(func),
             args: Vec::new(),
         }
@@ -723,7 +723,7 @@ pub struct PrefixExpression {
 impl PrefixExpression {
     fn new(token: Token, op: String) -> Self {
         PrefixExpression {
-            token: token.clone(),
+            token,
             op,
             right: None,
         }
@@ -760,7 +760,7 @@ pub struct InfixExpression {
 impl InfixExpression {
     fn new(token: Token, left: Expression, op: String) -> Self {
         InfixExpression {
-            token: token.clone(),
+            token,
             left: Some(Box::new(left)),
             op,
             right: None,
@@ -817,11 +817,7 @@ pub fn test_let_statements() {
 fn test_let_statement(s: Statement, name: String) -> bool {
     match s {
         Statement::Let(l) => {
-            if l.name.to_string() != name {
-                return false;
-            } else {
-                return true;
-            };
+            l.name.to_string() == name
         }
         _ => false,
     }
@@ -964,7 +960,7 @@ pub fn test_boolean_literal_expression() {
             Statement::Expression(e) => match e.token {
                 Token::True => {
                     let b: bool = e.token.to_string().parse().unwrap();
-                    assert_eq!(b, true, "bool value not true, got {b}");
+                    assert!(b, "bool value not true, got {b}");
                 }
                 _ => println!("token is not a bool, got {:?}", e.token),
             },
@@ -1167,7 +1163,7 @@ pub fn test_operator_precedence_parsing() {
                 actual,
                 test.1.to_string(),
                 "expected {}, got {}",
-                test.1.to_string(),
+                test.1,
                 actual
             )
         }
@@ -1193,7 +1189,7 @@ pub fn test_if_expression() {
         );
         let s = prog.statements[0].clone();
         match s.clone() {
-            Statement::Expression(e) => match *e.expression.clone().unwrap() {
+            Statement::Expression(e) => match *e.expression.unwrap() {
                 Expression::If(ife) => {
                     // add test infix
                     assert_eq!(
@@ -1223,9 +1219,9 @@ pub fn test_if_expression() {
                         )
                     }
                 }
-                _ => print!("expr is not an if, got {}", s.clone().to_string()),
+                _ => print!("expr is not an if, got {}", s.to_string()),
             },
-            _ => println!("stmt is not an expression, got {}", s.clone().to_string()),
+            _ => println!("stmt is not an expression, got {}", s.to_string()),
         };
     }
     println!("Passed test if expressions");
@@ -1250,7 +1246,7 @@ pub fn test_if_else_expression() {
         let s = prog.statements[0].clone();
 
         match s.clone() {
-            Statement::Expression(e) => match *e.expression.clone().unwrap() {
+            Statement::Expression(e) => match *e.expression.unwrap() {
                 Expression::If(ife) => {
                     // add test infix
                     assert_eq!(
@@ -1279,9 +1275,9 @@ pub fn test_if_else_expression() {
                         ife.alternative
                     )
                 }
-                _ => print!("expr is not an if, got {}", s.clone().to_string()),
+                _ => print!("expr is not an if, got {}", s.to_string()),
             },
-            _ => println!("stmt is not an expression, got {}", s.clone().to_string()),
+            _ => println!("stmt is not an expression, got {}", s.to_string()),
         };
     }
     println!("Passed test if else expressions");
@@ -1425,10 +1421,10 @@ pub fn test_call_expression() {
             Statement::Expression(e) => match *e.expression.clone().unwrap() {
                 Expression::Call(ce) => {
                     assert_eq!(
-                        ce.func.clone().to_string(),
+                        ce.func.to_string(),
                         "add",
                         "fn is not add, got {}",
-                        ce.func.clone().to_string()
+                        ce.func.to_string()
                     );
                     assert_eq!(ce.args.len(), 3, "args len is not 3, got {}", ce.args.len());
                     // test args work

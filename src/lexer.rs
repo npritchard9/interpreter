@@ -112,9 +112,9 @@ impl Lexer {
 
     fn peek(&self) -> u8 {
         if self.read_pos >= self.input.len() {
-            return 0;
+            0
         } else {
-            return self.input[self.read_pos];
+            self.input[self.read_pos]
         }
     }
 

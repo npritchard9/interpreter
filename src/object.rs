@@ -13,7 +13,7 @@ impl ToString for Object {
             Object::Int(i) => format!("{}", i.value),
             Object::Bool(b) => format!("{}", b.value),
             Object::Null => "null".to_string(),
-            Object::Return(r) => format!("{}", r.value.to_string()),
+            Object::Return(r) => r.value.to_string(),
             Object::Error(e) => e.to_string(),
         }
     }
