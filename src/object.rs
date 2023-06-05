@@ -7,6 +7,7 @@ pub enum Object {
     String(OString),
     Return(Return),
     Func(Function),
+    Builtin(BuiltinFn),
     Error(Err),
     Null,
 }
@@ -21,6 +22,7 @@ impl ToString for Object {
             Object::Return(r) => r.value.to_string(),
             Object::Error(e) => e.to_string(),
             Object::Func(f) => f.to_string(),
+            Object::Builtin(_) => String::from("builtin function"),
         }
     }
 }
@@ -35,6 +37,7 @@ impl Object {
             Object::Error(e) => e.to_string(),
             Object::Null => String::from("NULL"),
             Object::Func(_) => String::from("FUNCTION"),
+            Object::Builtin(_) => String::from("BUILTIN"),
         }
     }
 }
@@ -108,3 +111,5 @@ impl ToString for Function {
         )
     }
 }
+
+pub type BuiltinFn = fn(Vec<Object>) -> Object;

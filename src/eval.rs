@@ -1,4 +1,5 @@
 use crate::{
+    builtins::{self, Builtins},
     environment::{new_enclosed_env, Environment},
     lexer::{Lexer, Token},
     object::{self, Bool, Err, Function, Integer, OString, Object},
@@ -98,6 +99,9 @@ pub fn apply_function(func: Object, args: Vec<Object>) -> Object {
             let evaluated = eval(Node::Stmt(Statement::Block(f.body)), &mut extended_env);
             unwrap_return_value(evaluated)
         }
+        Object::Builtin(b) => {
+            return b(args);
+        }
         _ => {
             let msg = format!("not a function: {}", func.get_type());
             Object::Error(Err { msg })
@@ -136,8 +140,14 @@ pub fn eval_ident(token: Token, env: &mut Environment) -> Object {
     match env.get(token.to_string()) {
         Some(v) => v,
         None => {
-            let msg = format!("identifier not found: {}", token.to_string());
-            Object::Error(Err { msg })
+            let b = Builtins::new();
+            match b.fns.get(&token.to_string()) {
+                Some(bf) => Object::Builtin(*bf),
+                None => {
+                    let msg = format!("identifier not found: {}", token.to_string());
+                    Object::Error(Err { msg })
+                }
+            }
         }
     }
 }
@@ -638,10 +648,7 @@ pub fn test_string_literal() {
                 s.value
             )
         }
-        _ => println!(
-            "Not a string, got {}",
-            evaluated.unwrap().to_string()
-        ),
+        _ => println!("Not a string, got {}", evaluated.unwrap().to_string()),
     }
     println!("Passed test string literal")
 }
@@ -657,10 +664,42 @@ pub fn test_string_concat() {
                 s.value
             )
         }
-        _ => println!(
-            "Not a string, got {}",
-            evaluated.unwrap().to_string()
-        ),
+        _ => println!("Not a string, got {}", evaluated.unwrap().to_string()),
     }
     println!("Passed test string concat")
+}
+
+pub fn test_builtin_fn() {
+    enum TestRes {
+        Num(isize),
+        St(String),
+    }
+    let tests: Vec<(&str, TestRes)> = vec![
+        (r#"len("")"#, TestRes::Num(0)),
+        (r#"len("four")"#, TestRes::Num(4)),
+        (r#"len("hello world")"#, TestRes::Num(11)),
+        (
+            r#"len(1)"#,
+            TestRes::St("argument to 'len' not supported, got INTEGER".into()),
+        ),
+        (
+            r#"len("one", "two")"#,
+            TestRes::St("wrong number of arguments. got=2, want=1".into()),
+        ),
+    ];
+    for t in tests {
+        let evaluated = test_eval(t.0.to_string());
+        match t.1 {
+            TestRes::Num(n) => {
+                test_int_object(evaluated.unwrap(), n);
+            }
+            TestRes::St(s) => match evaluated.clone().unwrap() {
+                Object::Error(e) => {
+                    assert_eq!(e.msg, s, "wrong error msg, want {}, got {}", s, e.msg)
+                }
+                _ => println!("Obj is not error, got {}", evaluated.unwrap().to_string()),
+            },
+        }
+    }
+    println!("Passed test builtin fn");
 }

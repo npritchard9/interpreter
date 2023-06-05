@@ -6,6 +6,7 @@ mod lexer;
 mod object;
 mod parser;
 mod repl;
+mod builtins;
 
 fn main() {
     // let mut env = Environment::new();
@@ -37,4 +38,5 @@ fn main() {
     // eval::test_string_literal();
     // eval::test_error_handling(&mut env);
     // eval::test_string_concat();
+    // eval::test_builtin_fn();
 }
