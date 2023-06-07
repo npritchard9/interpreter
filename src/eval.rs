@@ -23,6 +23,11 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
             Expression::StringLit(sle) => {
                 return Object::String(object::OString { value: sle.value })
             }
+            Expression::ArrayLit(ale) => {
+                return Object::String(object::OString {
+                    value: ale.to_string(),
+                })
+            }
             Expression::Prefix(pe) => {
                 let right = eval(Node::Expr(*pe.right.unwrap()), env);
                 if is_error(right.clone()) {

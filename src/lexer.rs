@@ -27,8 +27,10 @@ pub enum Token {
     // delimiters
     Comma,
     Lbrace,
+    Lbracket,
     Lparen,
     Rbrace,
+    Rbracket,
     Rparen,
     Semicolon,
 
@@ -66,6 +68,8 @@ impl ToString for Token {
             Token::Rparen => ")".to_string(),
             Token::Lbrace => "{".to_string(),
             Token::Rbrace => "}".to_string(),
+            Token::Lbracket => "[".to_string(),
+            Token::Rbracket => "]".to_string(),
             Token::Function => "fn".to_string(),
             Token::Let => "let".to_string(),
             Token::If => "if".to_string(),
@@ -140,6 +144,8 @@ impl Lexer {
             b'-' => Token::Minus,
             b'{' => Token::Lbrace,
             b'}' => Token::Rbrace,
+            b'[' => Token::Lbracket,
+            b']' => Token::Rbracket,
             b'!' => {
                 if self.peek() == b'=' {
                     self.read_char();
@@ -246,6 +252,7 @@ mod tests {
             10 != 9;
             "foobar"
             "foo bar"
+            [1, 2];
             "#;
 
         let mut l = Lexer::new(input.into());
@@ -325,6 +332,12 @@ mod tests {
             Token::Semicolon,
             Token::TString(String::from("foobar")),
             Token::TString(String::from("foo bar")),
+            Token::Lbracket,
+            Token::Int(String::from("1")),
+            Token::Comma,
+            Token::Int(String::from("2")),
+            Token::Rbracket,
+            Token::Semicolon,
             Token::Eof,
         ];
         for token in tokens {

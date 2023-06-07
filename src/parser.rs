@@ -67,6 +67,10 @@ impl Parser {
             Token::TString("".to_string()),
             PrefixParseFn::Ref(Parser::parse_string_literal),
         );
+        p.register_prefix(
+            Token::Lbracket,
+            PrefixParseFn::Mut(Parser::parse_array_literal),
+        );
         p.register_infix(Token::Plus, Parser::parse_infix_expression);
         p.register_infix(Token::Minus, Parser::parse_infix_expression);
         p.register_infix(Token::Slash, Parser::parse_infix_expression);
@@ -146,6 +150,31 @@ impl Parser {
         Expression::Id(self.cur_token.clone())
     }
 
+    fn parse_expression_list(&mut self, end: Token) -> Vec<Option<Box<Expression>>> {
+        let mut list = vec![];
+        if self.peek_token_is(end.clone()) {
+            self.next_token();
+            return list;
+        }
+        self.next_token();
+        list.push(self.parse_expression(Prio::Lowest as usize));
+        while self.peek_token_is(Token::Comma) {
+            self.next_token();
+            self.next_token();
+            list.push(self.parse_expression(Prio::Lowest as usize));
+        }
+        if !self.expect_peek(end) {
+            return list;
+        }
+        list
+    }
+
+    fn parse_array_literal(&mut self) -> Expression {
+        let mut array = ArrayLiteral::new(self.cur_token.clone());
+        array.elements = self.parse_expression_list(Token::Rbracket);
+        Expression::ArrayLit(array)
+    }
+
     fn parse_string_literal(&self) -> Expression {
         Expression::StringLit(StringLiteral::new(self.cur_token.clone()))
     }
@@ -201,7 +230,8 @@ impl Parser {
 
     fn parse_call_expression(&mut self, func: Expression) -> Expression {
         let mut expr = CallExpression::new(self.cur_token.clone(), func);
-        expr.args = self.parse_call_arguments();
+        // expr.args = self.parse_call_arguments();
+        expr.args = self.parse_expression_list(Token::Rparen);
         Expression::Call(expr)
     }
 
@@ -417,6 +447,7 @@ impl ToString for Statement {
                     Expression::IntLit(ile) => ile.token.to_string(),
                     Expression::BoolLit(ble) => ble.token.to_string(),
                     Expression::StringLit(sle) => sle.token.to_string(),
+                    Expression::ArrayLit(ale) => ale.to_string(),
                     Expression::If(ife) => ife.to_string(),
                     Expression::Id(ide) => ide.to_string(),
                     Expression::Fn(fe) => fe.to_string(),
@@ -436,6 +467,7 @@ pub enum Expression {
     IntLit(IntegerLiteral),
     BoolLit(BooleanLiteral),
     StringLit(StringLiteral),
+    ArrayLit(ArrayLiteral),
     If(If),
     Id(Token),
     Fn(FunctionLiteral),
@@ -450,6 +482,7 @@ impl ToString for Expression {
             Expression::IntLit(ile) => ile.token.to_string(),
             Expression::BoolLit(ble) => ble.token.to_string(),
             Expression::StringLit(sle) => sle.token.to_string(),
+            Expression::ArrayLit(ale) => ale.to_string(),
             Expression::If(ife) => ife.to_string(),
             Expression::Id(ide) => ide.to_string(),
             Expression::Fn(fe) => fe.to_string(),
@@ -517,6 +550,31 @@ impl BooleanLiteral {
             token: token.clone(),
             value: token.to_string().parse().unwrap(),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArrayLiteral {
+    pub token: Token,
+    pub elements: Vec<Option<Box<Expression>>>,
+}
+
+impl ArrayLiteral {
+    pub fn new(token: Token) -> Self {
+        ArrayLiteral {
+            token,
+            elements: vec![],
+        }
+    }
+}
+
+impl ToString for ArrayLiteral {
+    fn to_string(&self) -> String {
+        let mut els = vec![];
+        for e in self.elements.iter() {
+            els.push(e.clone().unwrap().to_string())
+        }
+        format!("[{}]", els.join(", "))
     }
 }
 
@@ -766,6 +824,7 @@ impl ToString for PrefixExpression {
                 Expression::IntLit(il) => il.token.to_string(),
                 Expression::BoolLit(ble) => ble.token.to_string(),
                 Expression::StringLit(sle) => sle.token.to_string(),
+                Expression::ArrayLit(ale) => ale.to_string(),
                 Expression::If(ife) => ife.to_string(),
                 Expression::Id(id) => id.to_string(),
                 Expression::Fn(fe) => fe.to_string(),
@@ -1077,6 +1136,7 @@ pub fn test_integer_literal(il: Expression, value: isize) -> bool {
         Expression::Fn(_) => panic!("can't have a function holding an int"),
         Expression::Call(_) => panic!("can't have a call holding an int"),
         Expression::StringLit(_) => panic!("can't have a string holding an int"),
+        Expression::ArrayLit(_) => panic!("can't have an array holding an int"),
     }
     true
 }
@@ -1498,4 +1558,54 @@ pub fn test_string_literal_expression() {
         }
     }
     println!("Passed test string literal expression");
+}
+
+pub fn test_parsing_array_literal() {
+    let input = "[1, 2 * 2, 3 + 3]";
+    let l = Lexer::new(input.to_string());
+    let mut p = Parser::new(l);
+    let program = p.parse_program();
+    let errors = p.check_errors();
+    if errors {
+        process::exit(1);
+    }
+    if let Some(prog) = program {
+        match &prog.statements[0] {
+            Statement::Expression(e) => match *e.expression.clone().unwrap() {
+                Expression::ArrayLit(ale) => {
+                    assert_eq!(
+                        ale.elements.len(),
+                        3,
+                        "len elements not 3, got {}",
+                        ale.elements.len()
+                    );
+                    test_integer_literal(*ale.elements[0].clone().unwrap(), 1);
+                    assert_eq!(
+                        ale.elements[0].clone().unwrap().to_string(),
+                        "1",
+                        "a[0] not equal to 1, got {}",
+                        ale.elements[0].clone().unwrap().to_string()
+                    );
+                    assert_eq!(
+                        ale.elements[1].clone().unwrap().to_string(),
+                        "(2 * 2)",
+                        "a[1] not equal to (2 * 2), got {}",
+                        ale.elements[1].clone().unwrap().to_string()
+                    );
+                    assert_eq!(
+                        ale.elements[2].clone().unwrap().to_string(),
+                        "(3 + 3)",
+                        "a[2] not equal to (3 + 3), got {}",
+                        ale.elements[2].clone().unwrap().to_string()
+                    );
+                }
+                _ => println!(
+                    "expr is not an array, got {}",
+                    e.expression.clone().unwrap().to_string()
+                ),
+            },
+            _ => println!("Not an expr, got {}", prog.statements[0].to_string()),
+        }
+    }
+    println!("Passed test parsing array literal");
 }

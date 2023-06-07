@@ -39,4 +39,5 @@ fn main() {
     // eval::test_error_handling(&mut env);
     // eval::test_string_concat();
     // eval::test_builtin_fn();
+    // parser::test_parsing_array_literal();
 }
