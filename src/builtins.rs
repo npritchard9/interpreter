@@ -15,6 +15,9 @@ pub fn len(args: Vec<Object>) -> Object {
         Object::String(s) => Object::Int(object::Integer {
             value: s.value.len() as isize,
         }),
+        Object::Array(a) => Object::Int(object::Integer {
+            value: a.elements.len() as isize,
+        }),
         _ => {
             let msg = format!(
                 "argument to 'len' not supported, got {}",
