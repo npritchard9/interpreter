@@ -1,5 +1,5 @@
 use crate::{
-    builtins::{self, Builtins},
+    builtins::Builtins,
     environment::{new_enclosed_env, Environment},
     lexer::{Lexer, Token},
     object::{self, ArrObj, Bool, Err, Function, Integer, OString, Object},
@@ -759,6 +759,7 @@ pub fn test_array_literals() {
         }
         _ => println!("obj not array, got {}", evaluated.unwrap().to_string()),
     }
+    println!("Passed test array literals");
 }
 
 pub fn test_array_index_expressions() {
@@ -787,4 +788,5 @@ pub fn test_array_index_expressions() {
             None => assert!(test_null_object(evaluated.unwrap())),
         }
     }
+    println!("Passed test array index expressions");
 }
