@@ -40,7 +40,7 @@ impl Object {
             Object::Null => String::from("NULL"),
             Object::Func(_) => String::from("FUNCTION"),
             Object::Builtin(_) => String::from("BUILTIN"),
-            Object::Array(a) => String::from("ARRAY"),
+            Object::Array(_a) => String::from("ARRAY"),
         }
     }
 }

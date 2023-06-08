@@ -13,29 +13,29 @@ const NULL: Object = Object::Null;
 pub fn eval(node: Node, env: &mut Environment) -> Object {
     match node {
         Node::Expr(e) => match e {
-            Expression::IntLit(ile) => return Object::Int(Integer { value: ile.value }),
+            Expression::IntLit(ile) => Object::Int(Integer { value: ile.value }),
             Expression::BoolLit(ble) => {
-                return match ble.value {
+                match ble.value {
                     true => TRUE,
                     false => FALSE,
                 }
             }
             Expression::StringLit(sle) => {
-                return Object::String(object::OString { value: sle.value })
+                Object::String(object::OString { value: sle.value })
             }
             Expression::ArrayLit(ale) => {
                 let els = eval_expressions(ale.elements, env);
                 if els.len() == 1 && is_error(els[0].clone()) {
                     return els[0].clone();
                 }
-                return Object::Array(object::ArrObj { elements: els });
+                Object::Array(object::ArrObj { elements: els })
             }
             Expression::Prefix(pe) => {
                 let right = eval(Node::Expr(*pe.right.unwrap()), env);
                 if is_error(right.clone()) {
                     return right;
                 }
-                return eval_prefix_expression(pe.op, right);
+                eval_prefix_expression(pe.op, right)
             }
             Expression::Infix(ie) => {
                 let left = eval(Node::Expr(*ie.left.unwrap()), env);
@@ -46,17 +46,17 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
                 if is_error(right.clone()) {
                     return right;
                 }
-                return eval_infix_expression(ie.op, left, right);
+                eval_infix_expression(ie.op, left, right)
             }
-            Expression::If(ife) => return eval_if_expression(ife, env),
+            Expression::If(ife) => eval_if_expression(ife, env),
             Expression::Fn(fne) => {
                 let params = fne.params;
                 let body = fne.body;
-                return Object::Func(Function {
+                Object::Func(Function {
                     params,
                     env: env.clone(),
                     body,
-                });
+                })
             }
             Expression::Call(ce) => {
                 let func = eval(Node::Expr(*ce.func), env);
@@ -67,9 +67,9 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
                 if args.len() == 1 && is_error(args[0].clone()) {
                     return args[0].clone();
                 }
-                return apply_function(func, args);
+                apply_function(func, args)
             }
-            Expression::Id(ide) => return eval_ident(ide, env),
+            Expression::Id(ide) => eval_ident(ide, env),
             Expression::Index(ine) => {
                 let left = eval(Node::Expr(*ine.left.unwrap()), env);
                 if is_error(left.clone()) {
@@ -79,24 +79,24 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
                 if is_error(right.clone()) {
                     return right;
                 }
-                return eval_index_expression(left, right);
+                eval_index_expression(left, right)
             }
         },
-        Node::Prog(p) => return eval_program(p, env),
+        Node::Prog(p) => eval_program(p, env),
         Node::Stmt(s) => match s {
             Statement::Expression(es) => match es.expression {
-                Some(e) => return eval(Node::Expr(*e), env),
-                None => return NULL,
+                Some(e) => eval(Node::Expr(*e), env),
+                None => NULL,
             },
-            Statement::Block(bs) => return eval_block_statement(bs, env),
+            Statement::Block(bs) => eval_block_statement(bs, env),
             Statement::Return(rs) => {
                 let val = eval(Node::Expr(*rs.value.unwrap()), env);
                 if is_error(val.clone()) {
                     return val;
                 }
-                return Object::Return(object::Return {
+                Object::Return(object::Return {
                     value: Box::new(val),
-                });
+                })
             }
             Statement::Let(ls) => {
                 let val = eval(Node::Expr(*ls.value.unwrap()), env);
@@ -118,7 +118,7 @@ pub fn apply_function(func: Object, args: Vec<Object>) -> Object {
             unwrap_return_value(evaluated)
         }
         Object::Builtin(b) => {
-            return b(args);
+            b(args)
         }
         _ => {
             let msg = format!("not a function: {}", func.get_type());
@@ -204,7 +204,7 @@ pub fn eval_index_expression(left: Object, right: Object) -> Object {
         return eval_array_index_expression(left, right);
     }
     let msg = format!("index operator not supported: {}", left.to_string());
-    return Object::Error(Err { msg });
+    Object::Error(Err { msg })
 }
 
 pub fn eval_array_index_expression(array: Object, index: Object) -> Object {
@@ -215,7 +215,7 @@ pub fn eval_array_index_expression(array: Object, index: Object) -> Object {
     if value < 0 || value as usize > max {
         return NULL;
     }
-    return elements[value as usize].clone();
+    elements[value as usize].clone()
 }
 
 pub fn is_truthy(obj: Object) -> bool {
