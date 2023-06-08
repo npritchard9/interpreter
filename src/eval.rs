@@ -2,7 +2,7 @@ use crate::{
     builtins::{self, Builtins},
     environment::{new_enclosed_env, Environment},
     lexer::{Lexer, Token},
-    object::{self, Bool, Err, Function, Integer, OString, Object},
+    object::{self, ArrObj, Bool, Err, Function, Integer, OString, Object},
     parser::{BlockStatement, Expression, If, Node, Parser, Program, Statement},
 };
 
@@ -24,9 +24,11 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
                 return Object::String(object::OString { value: sle.value })
             }
             Expression::ArrayLit(ale) => {
-                return Object::String(object::OString {
-                    value: ale.to_string(),
-                })
+                let els = eval_expressions(ale.elements, env);
+                if els.len() == 1 && is_error(els[0].clone()) {
+                    return els[0].clone();
+                }
+                return Object::Array(object::ArrObj { elements: els });
             }
             Expression::Prefix(pe) => {
                 let right = eval(Node::Expr(*pe.right.unwrap()), env);
@@ -68,6 +70,17 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
                 return apply_function(func, args);
             }
             Expression::Id(ide) => return eval_ident(ide, env),
+            Expression::Index(ine) => {
+                let left = eval(Node::Expr(*ine.left.unwrap()), env);
+                if is_error(left.clone()) {
+                    return left;
+                }
+                let right = eval(Node::Expr(*ine.right.unwrap()), env);
+                if is_error(right.clone()) {
+                    return right;
+                }
+                return eval_index_expression(left, right);
+            }
         },
         Node::Prog(p) => return eval_program(p, env),
         Node::Stmt(s) => match s {
@@ -90,11 +103,11 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
                 if is_error(val.clone()) {
                     return val;
                 }
-                env.set(ls.name.to_string(), val);
+                env.set(ls.name.to_string(), val.clone());
+                val
             }
         },
     }
-    NULL
 }
 
 pub fn apply_function(func: Object, args: Vec<Object>) -> Object {
@@ -174,7 +187,7 @@ pub fn eval_if_expression(ife: If, env: &mut Environment) -> Object {
 }
 
 pub fn eval_block_statement(block: BlockStatement, env: &mut Environment) -> Object {
-    let mut res = Object::Null;
+    let mut res = NULL;
     for s in block.statements {
         res = eval(Node::Stmt(s), env);
         match res {
@@ -183,6 +196,26 @@ pub fn eval_block_statement(block: BlockStatement, env: &mut Environment) -> Obj
         }
     }
     res
+}
+
+pub fn eval_index_expression(left: Object, right: Object) -> Object {
+    // could use get type
+    if matches!(left, Object::Array(_)) && matches!(right, Object::Int(_)) {
+        return eval_array_index_expression(left, right);
+    }
+    let msg = format!("index operator not supported: {}", left.to_string());
+    return Object::Error(Err { msg });
+}
+
+pub fn eval_array_index_expression(array: Object, index: Object) -> Object {
+    let Object::Array(ArrObj { elements }) = array else {panic!("not an array")};
+
+    let Object::Int(Integer { value }) = index else {panic!("not an int")};
+    let max = elements.len() - 1;
+    if value < 0 || value as usize > max {
+        return NULL;
+    }
+    return elements[value as usize].clone();
 }
 
 pub fn is_truthy(obj: Object) -> bool {
@@ -197,7 +230,7 @@ pub fn is_error(obj: Object) -> bool {
 }
 
 pub fn eval_program(p: Program, env: &mut Environment) -> Object {
-    let mut res = Object::Null;
+    let mut res = NULL;
     for s in p.statements {
         res = eval(Node::Stmt(s), env);
         match res.clone() {
@@ -707,4 +740,51 @@ pub fn test_builtin_fn() {
         }
     }
     println!("Passed test builtin fn");
+}
+
+pub fn test_array_literals() {
+    let input = "[1, 2 * 2, 3 + 3]";
+    let evaluated = test_eval(input.to_string());
+    match evaluated.clone().unwrap() {
+        Object::Array(a) => {
+            assert_eq!(
+                a.elements.len(),
+                3,
+                "wrong num els, want 3, got {}",
+                a.elements.len()
+            );
+            assert_eq!(a.elements[0].to_string(), "1");
+            assert_eq!(a.elements[1].to_string(), "4");
+            assert_eq!(a.elements[2].to_string(), "6");
+        }
+        _ => println!("obj not array, got {}", evaluated.unwrap().to_string()),
+    }
+}
+
+pub fn test_array_index_expressions() {
+    let tests = vec![
+        ("[1, 2, 3][0]", Some(1)),
+        ("[1, 2, 3][1]", Some(2)),
+        ("[1, 2, 3][2]", Some(3)),
+        ("let i = 0; [1][i];", Some(1)),
+        ("[1, 2, 3][1 + 1];", Some(3)),
+        ("let myArray = [1, 2, 3]; myArray[2];", Some(3)),
+        (
+            "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+            Some(6),
+        ),
+        (
+            "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+            Some(2),
+        ),
+        ("[1, 2, 3][3]", None),
+        ("[1, 2, 3][-1]", None),
+    ];
+    for t in tests {
+        let evaluated = test_eval(t.0.to_string());
+        match t.1 {
+            Some(i) => assert!(test_int_object(evaluated.unwrap(), i)),
+            None => assert!(test_null_object(evaluated.unwrap())),
+        }
+    }
 }

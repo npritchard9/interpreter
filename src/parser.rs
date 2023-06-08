@@ -80,6 +80,7 @@ impl Parser {
         p.register_infix(Token::LessThan, Parser::parse_infix_expression);
         p.register_infix(Token::GreaterThan, Parser::parse_infix_expression);
         p.register_infix(Token::Lparen, Parser::parse_call_expression);
+        p.register_infix(Token::Lbracket, Parser::parse_index_expression);
         p
     }
 
@@ -114,6 +115,7 @@ impl Parser {
             Token::Plus | Token::Minus => Prio::Sum as usize,
             Token::Slash | Token::Asterisk => Prio::Product as usize,
             Token::Lparen => Prio::Call as usize,
+            Token::Lbracket => Prio::Index as usize,
             _ => Prio::Lowest as usize,
         }
     }
@@ -125,6 +127,7 @@ impl Parser {
             Token::Plus | Token::Minus => Prio::Sum as usize,
             Token::Slash | Token::Asterisk => Prio::Product as usize,
             Token::Lparen => Prio::Call as usize,
+            Token::Lbracket => Prio::Index as usize,
             _ => Prio::Lowest as usize,
         }
     }
@@ -233,6 +236,16 @@ impl Parser {
         // expr.args = self.parse_call_arguments();
         expr.args = self.parse_expression_list(Token::Rparen);
         Expression::Call(expr)
+    }
+
+    fn parse_index_expression(&mut self, left: Expression) -> Expression {
+        let mut exp = IndexExpression::new(self.cur_token.clone(), left);
+        self.next_token();
+        exp.right = self.parse_expression(Prio::Lowest as usize);
+        if !self.expect_peek(Token::Rbracket) {
+            return Expression::Index(exp);
+        }
+        Expression::Index(exp)
     }
 
     fn parse_call_arguments(&mut self) -> Vec<Option<Box<Expression>>> {
@@ -452,6 +465,7 @@ impl ToString for Statement {
                     Expression::Id(ide) => ide.to_string(),
                     Expression::Fn(fe) => fe.to_string(),
                     Expression::Call(ce) => ce.to_string(),
+                    Expression::Index(ine) => ine.to_string(),
                 },
                 None => String::from(""),
             },
@@ -468,6 +482,7 @@ pub enum Expression {
     BoolLit(BooleanLiteral),
     StringLit(StringLiteral),
     ArrayLit(ArrayLiteral),
+    Index(IndexExpression),
     If(If),
     Id(Token),
     Fn(FunctionLiteral),
@@ -487,6 +502,7 @@ impl ToString for Expression {
             Expression::Id(ide) => ide.to_string(),
             Expression::Fn(fe) => fe.to_string(),
             Expression::Call(ce) => ce.to_string(),
+            Expression::Index(ine) => ine.to_string(),
         }
     }
 }
@@ -575,6 +591,31 @@ impl ToString for ArrayLiteral {
             els.push(e.clone().unwrap().to_string())
         }
         format!("[{}]", els.join(", "))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexExpression {
+    pub token: Token,
+    pub left: Option<Box<Expression>>,
+    pub right: Option<Box<Expression>>,
+}
+
+impl IndexExpression {
+    fn new(token: Token, left: Expression) -> Self {
+        IndexExpression {
+            token,
+            left: Some(Box::new(left)),
+            right: None,
+        }
+    }
+}
+
+impl ToString for IndexExpression {
+    fn to_string(&self) -> String {
+        let Some(ref l) = self.left else { return "No left".to_string()};
+        let Some(ref r) = self.right else { return "No right".to_string()};
+        format!("({}[{}])", l.to_string(), r.to_string())
     }
 }
 
@@ -796,6 +837,7 @@ enum Prio {
     Product,
     Prefix,
     Call,
+    Index,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -829,6 +871,7 @@ impl ToString for PrefixExpression {
                 Expression::Id(id) => id.to_string(),
                 Expression::Fn(fe) => fe.to_string(),
                 Expression::Call(ce) => ce.to_string(),
+                Expression::Index(ine) => ine.to_string(),
             },
             None => "".to_string(),
         };
@@ -1137,6 +1180,7 @@ pub fn test_integer_literal(il: Expression, value: isize) -> bool {
         Expression::Call(_) => panic!("can't have a call holding an int"),
         Expression::StringLit(_) => panic!("can't have a string holding an int"),
         Expression::ArrayLit(_) => panic!("can't have an array holding an int"),
+        Expression::Index(_) => panic!("can't have an index holding an int"),
     }
     true
 }
@@ -1233,6 +1277,14 @@ pub fn test_operator_precedence_parsing() {
         (
             "3 + 4 * 5 == 3 * 1 + 4 * 5",
             "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+        ),
+        (
+            "a * [1, 2, 3, 4][b * c] * d",
+            "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+        ),
+        (
+            "add(a * b[2], b[1], 2 * [1, 2][1])",
+            "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
         ),
     ];
 
@@ -1608,4 +1660,41 @@ pub fn test_parsing_array_literal() {
         }
     }
     println!("Passed test parsing array literal");
+}
+
+pub fn test_parsing_index_expressions() {
+    let input = "myArray[1 + 1]";
+    let l = Lexer::new(input.to_string());
+    let mut p = Parser::new(l);
+    let program = p.parse_program();
+    let errors = p.check_errors();
+    if errors {
+        process::exit(1);
+    }
+    if let Some(prog) = program {
+        match &prog.statements[0] {
+            Statement::Expression(e) => match *e.expression.clone().unwrap() {
+                Expression::Index(ie) => {
+                    assert_eq!(
+                        ie.left.clone().unwrap().to_string(),
+                        "myArray",
+                        "didnt get myArray, got {}",
+                        ie.left.unwrap().to_string()
+                    );
+                    assert_eq!(
+                        ie.right.clone().unwrap().to_string(),
+                        "(1 + 1)",
+                        "didnt get (1 + 1), got {}",
+                        ie.right.unwrap().to_string()
+                    );
+                }
+                _ => println!(
+                    "expr not an index, got {}",
+                    e.expression.clone().unwrap().to_string()
+                ),
+            },
+            _ => println!("stmt not an expr, got {}", prog.statements[0].to_string()),
+        }
+    }
+    println!("Passed test parsing index expressions")
 }

@@ -8,6 +8,7 @@ pub enum Object {
     Return(Return),
     Func(Function),
     Builtin(BuiltinFn),
+    Array(ArrObj),
     Error(Err),
     Null,
 }
@@ -18,11 +19,12 @@ impl ToString for Object {
             Object::Int(i) => format!("{}", i.value),
             Object::Bool(b) => format!("{}", b.value),
             Object::String(s) => s.value.to_string(),
-            Object::Null => "".to_string(),
+            Object::Null => "null".to_string(),
             Object::Return(r) => r.value.to_string(),
             Object::Error(e) => e.to_string(),
             Object::Func(f) => f.to_string(),
             Object::Builtin(_) => String::from("builtin function"),
+            Object::Array(a) => a.to_string(),
         }
     }
 }
@@ -38,6 +40,7 @@ impl Object {
             Object::Null => String::from("NULL"),
             Object::Func(_) => String::from("FUNCTION"),
             Object::Builtin(_) => String::from("BUILTIN"),
+            Object::Array(a) => String::from("ARRAY"),
         }
     }
 }
@@ -109,6 +112,21 @@ impl ToString for Function {
             params.join(", "),
             self.body.to_string()
         )
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ArrObj {
+    pub elements: Vec<Object>,
+}
+
+impl ToString for ArrObj {
+    fn to_string(&self) -> String {
+        let mut els = vec![];
+        for e in self.elements.iter() {
+            els.push(e.to_string());
+        }
+        format!("[{}]", els.join(", "))
     }
 }
 

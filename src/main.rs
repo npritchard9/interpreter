@@ -1,12 +1,12 @@
 // use environment::Environment;
 
+mod builtins;
 mod environment;
 mod eval;
 mod lexer;
 mod object;
 mod parser;
 mod repl;
-mod builtins;
 
 fn main() {
     // let mut env = Environment::new();
@@ -40,4 +40,7 @@ fn main() {
     // eval::test_string_concat();
     // eval::test_builtin_fn();
     // parser::test_parsing_array_literal();
+    // parser::test_parsing_index_expressions();
+    // eval::test_array_literals();
+    // eval::test_array_index_expressions();
 }
