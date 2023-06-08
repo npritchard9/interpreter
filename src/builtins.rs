@@ -87,6 +87,31 @@ pub fn rest(args: Vec<Object>) -> Object {
     }
 }
 
+pub fn push(args: Vec<Object>) -> Object {
+    if args.len() != 2 {
+        let msg = format!("wrong number of arguments. got={}, want=2", args.len());
+        return Object::Error(object::Err { msg });
+    }
+    match &args[0] {
+        Object::Array(a) => {
+            let len = a.elements.len();
+            if len > 0 {
+                let mut copy_els = a.elements.clone();
+                copy_els.push(args[1].clone());
+                return Object::Array(object::ArrObj { elements: copy_els });
+            }
+            a.elements.last().unwrap().clone()
+        }
+        _ => {
+            let msg = format!(
+                "argument to 'push' must be array, got {}",
+                args[0].get_type()
+            );
+            Object::Error(object::Err { msg })
+        }
+    }
+}
+
 impl Builtins {
     pub fn new() -> Self {
         let mut h = HashMap::new();
@@ -94,6 +119,7 @@ impl Builtins {
         h.insert("first".to_string(), first as fn(Vec<Object>) -> Object);
         h.insert("last".to_string(), last as fn(Vec<Object>) -> Object);
         h.insert("rest".to_string(), rest as fn(Vec<Object>) -> Object);
+        h.insert("push".to_string(), push as fn(Vec<Object>) -> Object);
         Builtins { fns: h }
     }
 }
