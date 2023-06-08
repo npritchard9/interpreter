@@ -62,12 +62,38 @@ pub fn last(args: Vec<Object>) -> Object {
     }
 }
 
+pub fn rest(args: Vec<Object>) -> Object {
+    if args.len() != 1 {
+        let msg = format!("wrong number of arguments. got={}, want=1", args.len());
+        return Object::Error(object::Err { msg });
+    }
+    match &args[0] {
+        Object::Array(a) => {
+            let len = a.elements.len();
+            if len > 0 {
+                return Object::Array(object::ArrObj {
+                    elements: a.elements[1..].to_vec(),
+                });
+            }
+            a.elements.last().unwrap().clone()
+        }
+        _ => {
+            let msg = format!(
+                "argument to 'rest' must be array, got {}",
+                args[0].get_type()
+            );
+            Object::Error(object::Err { msg })
+        }
+    }
+}
+
 impl Builtins {
     pub fn new() -> Self {
         let mut h = HashMap::new();
         h.insert("len".to_string(), len as fn(Vec<Object>) -> Object);
         h.insert("first".to_string(), first as fn(Vec<Object>) -> Object);
         h.insert("last".to_string(), last as fn(Vec<Object>) -> Object);
+        h.insert("rest".to_string(), rest as fn(Vec<Object>) -> Object);
         Builtins { fns: h }
     }
 }
