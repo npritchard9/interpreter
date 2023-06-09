@@ -43,4 +43,6 @@ fn main() {
     // parser::test_parsing_index_expressions();
     // eval::test_array_literals();
     // eval::test_array_index_expressions();
+    // parser::test_hash_literal_string_keys();
+    // parser::test_empty_hash_literal();
 }

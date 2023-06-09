@@ -14,15 +14,11 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
     match node {
         Node::Expr(e) => match e {
             Expression::IntLit(ile) => Object::Int(Integer { value: ile.value }),
-            Expression::BoolLit(ble) => {
-                match ble.value {
-                    true => TRUE,
-                    false => FALSE,
-                }
-            }
-            Expression::StringLit(sle) => {
-                Object::String(object::OString { value: sle.value })
-            }
+            Expression::BoolLit(ble) => match ble.value {
+                true => TRUE,
+                false => FALSE,
+            },
+            Expression::StringLit(sle) => Object::String(object::OString { value: sle.value }),
             Expression::ArrayLit(ale) => {
                 let els = eval_expressions(ale.elements, env);
                 if els.len() == 1 && is_error(els[0].clone()) {
@@ -81,6 +77,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
                 }
                 eval_index_expression(left, right)
             }
+            Expression::HashLit(_) => todo!(),
         },
         Node::Prog(p) => eval_program(p, env),
         Node::Stmt(s) => match s {
@@ -117,9 +114,7 @@ pub fn apply_function(func: Object, args: Vec<Object>) -> Object {
             let evaluated = eval(Node::Stmt(Statement::Block(f.body)), &mut extended_env);
             unwrap_return_value(evaluated)
         }
-        Object::Builtin(b) => {
-            b(args)
-        }
+        Object::Builtin(b) => b(args),
         _ => {
             let msg = format!("not a function: {}", func.get_type());
             Object::Error(Err { msg })

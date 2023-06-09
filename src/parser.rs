@@ -1,4 +1,7 @@
-use std::{collections::HashMap, process};
+use std::{
+    collections::{BTreeMap, HashMap},
+    process,
+};
 
 use crate::lexer::{Lexer, Token};
 
@@ -70,6 +73,10 @@ impl Parser {
         p.register_prefix(
             Token::Lbracket,
             PrefixParseFn::Mut(Parser::parse_array_literal),
+        );
+        p.register_prefix(
+            Token::Lbrace,
+            PrefixParseFn::Mut(Parser::parse_hash_literal),
         );
         p.register_infix(Token::Plus, Parser::parse_infix_expression);
         p.register_infix(Token::Minus, Parser::parse_infix_expression);
@@ -170,6 +177,27 @@ impl Parser {
             return list;
         }
         list
+    }
+
+    fn parse_hash_literal(&mut self) -> Expression {
+        let mut hash = HashLiteral::new(self.cur_token.clone());
+        while !self.peek_token_is(Token::Rbrace) {
+            self.next_token();
+            let k = self.parse_expression(Prio::Lowest as usize);
+            if !self.expect_peek(Token::Colon) {
+                return Expression::HashLit(hash);
+            }
+            self.next_token();
+            let v = self.parse_expression(Prio::Lowest as usize);
+            hash.pairs.insert(*k.unwrap(), *v.unwrap());
+            if !self.peek_token_is(Token::Rbrace) && !self.expect_peek(Token::Comma) {
+                return Expression::HashLit(hash);
+            }
+        }
+        if !self.expect_peek(Token::Rbrace) {
+            return Expression::HashLit(hash);
+        }
+        Expression::HashLit(hash)
     }
 
     fn parse_array_literal(&mut self) -> Expression {
@@ -440,7 +468,7 @@ impl Parser {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -466,6 +494,7 @@ impl ToString for Statement {
                     Expression::Fn(fe) => fe.to_string(),
                     Expression::Call(ce) => ce.to_string(),
                     Expression::Index(ine) => ine.to_string(),
+                    Expression::HashLit(hle) => hle.to_string(),
                 },
                 None => String::from(""),
             },
@@ -474,7 +503,7 @@ impl ToString for Statement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum Expression {
     Prefix(PrefixExpression),
     Infix(InfixExpression),
@@ -483,6 +512,7 @@ pub enum Expression {
     StringLit(StringLiteral),
     ArrayLit(ArrayLiteral),
     Index(IndexExpression),
+    HashLit(HashLiteral),
     If(If),
     Id(Token),
     Fn(FunctionLiteral),
@@ -503,11 +533,12 @@ impl ToString for Expression {
             Expression::Fn(fe) => fe.to_string(),
             Expression::Call(ce) => ce.to_string(),
             Expression::Index(ine) => ine.to_string(),
+            Expression::HashLit(hle) => hle.to_string(),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct ExpressionStatement {
     pub token: Token,
     pub expression: Option<Box<Expression>>,
@@ -522,7 +553,7 @@ impl ExpressionStatement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct StringLiteral {
     pub token: Token,
     pub value: String,
@@ -538,7 +569,7 @@ impl StringLiteral {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: isize,
@@ -554,7 +585,7 @@ impl IntegerLiteral {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct BooleanLiteral {
     pub token: Token,
     pub value: bool,
@@ -569,7 +600,7 @@ impl BooleanLiteral {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct ArrayLiteral {
     pub token: Token,
     pub elements: Vec<Option<Box<Expression>>>,
@@ -594,7 +625,7 @@ impl ToString for ArrayLiteral {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct IndexExpression {
     pub token: Token,
     pub left: Option<Box<Expression>>,
@@ -619,7 +650,32 @@ impl ToString for IndexExpression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct HashLiteral {
+    pub token: Token,
+    pub pairs: BTreeMap<Expression, Expression>,
+}
+
+impl HashLiteral {
+    fn new(token: Token) -> Self {
+        HashLiteral {
+            token,
+            pairs: BTreeMap::new(),
+        }
+    }
+}
+
+impl ToString for HashLiteral {
+    fn to_string(&self) -> String {
+        let mut pairs = vec![];
+        for (k, v) in self.pairs.iter() {
+            pairs.push(format!("{}:{}", k.to_string(), v.to_string()))
+        }
+        format!("{{{}}}", pairs.join(", "))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct If {
     pub token: Token,
     pub cond: Option<Box<Expression>>,
@@ -658,7 +714,7 @@ impl ToString for If {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct FunctionLiteral {
     pub token: Token,
     pub params: Vec<Token>,
@@ -690,7 +746,7 @@ impl ToString for FunctionLiteral {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct CallExpression {
     pub token: Token,
     pub func: Box<Expression>,
@@ -717,7 +773,7 @@ impl ToString for CallExpression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct BlockStatement {
     pub token: Token,
     pub statements: Vec<Statement>,
@@ -742,7 +798,7 @@ impl ToString for BlockStatement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Token,
@@ -778,7 +834,7 @@ impl ToString for LetStatement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct ReturnStatement {
     pub token: Token,
     pub value: Option<Box<Expression>>,
@@ -840,7 +896,7 @@ enum Prio {
     Index,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct PrefixExpression {
     pub token: Token,
     pub op: String,
@@ -872,6 +928,7 @@ impl ToString for PrefixExpression {
                 Expression::Fn(fe) => fe.to_string(),
                 Expression::Call(ce) => ce.to_string(),
                 Expression::Index(ine) => ine.to_string(),
+                Expression::HashLit(hle) => hle.to_string(),
             },
             None => "".to_string(),
         };
@@ -879,7 +936,7 @@ impl ToString for PrefixExpression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct InfixExpression {
     pub token: Token,
     pub left: Option<Box<Expression>>,
@@ -1181,6 +1238,7 @@ pub fn test_integer_literal(il: Expression, value: isize) -> bool {
         Expression::StringLit(_) => panic!("can't have a string holding an int"),
         Expression::ArrayLit(_) => panic!("can't have an array holding an int"),
         Expression::Index(_) => panic!("can't have an index holding an int"),
+        Expression::HashLit(hle) => panic!("can't have a hashlit holding an int"),
     }
     true
 }
@@ -1697,4 +1755,74 @@ pub fn test_parsing_index_expressions() {
         }
     }
     println!("Passed test parsing index expressions")
+}
+
+pub fn test_hash_literal_string_keys() {
+    let input = r#"{"one": 1, "two": 2, "three": 3}"#;
+    let l = Lexer::new(input.to_string());
+    let mut p = Parser::new(l);
+    let program = p.parse_program();
+    let errors = p.check_errors();
+    if errors {
+        process::exit(1);
+    }
+    if let Some(prog) = program {
+        match &prog.statements[0] {
+            Statement::Expression(e) => match *e.expression.clone().unwrap() {
+                Expression::HashLit(hle) => {
+                    assert_eq!(hle.pairs.len(), 3, "didn't get 3, got {}", hle.pairs.len());
+                    let mut expected = HashMap::new();
+                    expected.insert("one", 1);
+                    expected.insert("two", 2);
+                    expected.insert("three", 3);
+                    for (k, v) in hle.pairs {
+                        match k {
+                            Expression::StringLit(s) => {
+                                let exp_val = expected[s.value.as_str()];
+                                assert!(
+                                    test_integer_literal(v.clone(), exp_val),
+                                    "val not what was expected, want {}, got {}",
+                                    exp_val,
+                                    v.to_string()
+                                )
+                            }
+                            _ => println!("key is not a string lit, got {}", k.to_string()),
+                        }
+                    }
+                }
+                _ => println!(
+                    "expr not a hash lit, got {}",
+                    e.expression.clone().unwrap().to_string()
+                ),
+            },
+            _ => println!("stmt not an expr, got {}", prog.statements[0].to_string()),
+        }
+    }
+    println!("Passed test hash literal string keys");
+}
+
+pub fn test_empty_hash_literal() {
+    let input = "{}";
+    let l = Lexer::new(input.to_string());
+    let mut p = Parser::new(l);
+    let program = p.parse_program();
+    let errors = p.check_errors();
+    if errors {
+        process::exit(1);
+    }
+    if let Some(prog) = program {
+        match &prog.statements[0] {
+            Statement::Expression(e) => match *e.expression.clone().unwrap() {
+                Expression::HashLit(hle) => {
+                    assert_eq!(hle.pairs.len(), 0, "didn't get 0, got {}", hle.pairs.len());
+                }
+                _ => println!(
+                    "expr not a hash lit, got {}",
+                    e.expression.clone().unwrap().to_string()
+                ),
+            },
+            _ => println!("stmt not an expr, got {}", prog.statements[0].to_string()),
+        }
+    }
+    println!("Passed test empty hash literal");
 }

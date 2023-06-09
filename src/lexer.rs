@@ -1,6 +1,6 @@
 use std::io;
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
 #[repr(usize)]
 pub enum Token {
     // identifiers
@@ -33,6 +33,7 @@ pub enum Token {
     Rbracket,
     Rparen,
     Semicolon,
+    Colon,
 
     // keywords
     Else,
@@ -64,6 +65,7 @@ impl ToString for Token {
             Token::Minus => "-".to_string(),
             Token::Comma => ",".to_string(),
             Token::Semicolon => ";".to_string(),
+            Token::Colon => ":".to_string(),
             Token::Lparen => "(".to_string(),
             Token::Rparen => ")".to_string(),
             Token::Lbrace => "{".to_string(),
@@ -137,6 +139,7 @@ impl Lexer {
             }
             b'"' => Token::TString(self.read_string()),
             b';' => Token::Semicolon,
+            b':' => Token::Colon,
             b'(' => Token::Lparen,
             b')' => Token::Rparen,
             b',' => Token::Comma,
@@ -253,6 +256,7 @@ mod tests {
             "foobar"
             "foo bar"
             [1, 2];
+            {"foo": "bar"}
             "#;
 
         let mut l = Lexer::new(input.into());
@@ -338,6 +342,11 @@ mod tests {
             Token::Int(String::from("2")),
             Token::Rbracket,
             Token::Semicolon,
+            Token::Lbrace,
+            Token::TString(String::from("foo")),
+            Token::Colon,
+            Token::TString(String::from("bar")),
+            Token::Rbrace,
             Token::Eof,
         ];
         for token in tokens {
